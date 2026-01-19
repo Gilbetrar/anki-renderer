@@ -184,3 +184,89 @@ Style options:
   nightMode: true,                     // Add NIGHT_MODE_CSS + nightMode class
 }
 ```
+
+## AWS Deployment
+
+The demo site is deployed to AWS, not GitHub Pages.
+
+**Live site**: https://anki-renderer.bjblabs.com
+
+### Infrastructure
+
+| Resource | Value |
+|----------|-------|
+| S3 Bucket | `anki-renderer-demo-719390918663` |
+| CloudFront Distribution | `E7ZBUOH7HRPA5` |
+| Domain | `anki-renderer.bjblabs.com` |
+| CDK Stack | `AnkiRendererDemoStack` |
+
+### Stack Components
+
+- **S3**: Private bucket, CloudFront-only access via OAC
+- **CloudFront**: HTTPS, caching, custom domain
+- **ACM**: TLS certificate, auto-validated via Route 53
+- **Route 53**: A record alias to CloudFront
+
+### Deployment Flow
+
+```
+Push to main → CI passes → Deploy workflow triggers → CDK deploy
+```
+
+The deploy workflow (`.github/workflows/deploy.yml`):
+1. Builds WASM (web + node targets)
+2. Builds TypeScript library
+3. Builds demo site with Vite
+4. Runs `cdk deploy` to update infrastructure and upload files
+
+### CDK Infrastructure
+
+Location: `/infra`
+
+```bash
+cd infra
+npm install
+npx cdk synth      # Preview CloudFormation template
+npx cdk deploy     # Deploy (requires AWS credentials)
+npx cdk diff       # Show pending changes
+```
+
+Key files:
+- `bin/app.ts` - CDK app entry point, defines stack props
+- `lib/static-site-stack.ts` - S3 + CloudFront + Route 53 stack
+
+### AWS Authentication
+
+GitHub Actions uses OIDC (no long-lived credentials):
+- **IAM Role**: `github-actions-anki-renderer`
+- **Trust**: Only `Gilbetrar/anki-renderer` repo can assume
+- **Secret**: `AWS_ROLE_ARN` in GitHub repo settings
+
+### Manual Deployment
+
+If you need to deploy manually (not via CI):
+
+```bash
+# Ensure AWS credentials are configured
+aws sts get-caller-identity
+
+# Build everything
+npm run build
+cd demo && npm install && npm run build && cd ..
+
+# Deploy
+cd infra
+npm install
+npx cdk deploy
+```
+
+### Troubleshooting
+
+**DNS not resolving**: Route 53 changes propagate quickly, but local DNS caches may hold stale records. Flush DNS cache:
+```bash
+sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder
+```
+
+**CloudFront 403 errors**: Check S3 bucket policy allows CloudFront OAC access.
+
+**Certificate issues**: ACM certificates must be in `us-east-1` for CloudFront. The CDK stack handles this.
