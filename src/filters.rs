@@ -61,7 +61,7 @@ fn filter_hint(content: &str) -> String {
     }
 
     // Generate a unique ID for this hint based on content hash
-    let hash = simple_hash(content);
+    let hash = blake3_hash_id(content);
 
     format!(
         "<a class=\"hint\" href=\"#\" onclick=\"this.style.display='none';document.getElementById('hint{}').style.display='block';return false;\">Show Hint</a><div id=\"hint{}\" class=\"hint\" style=\"display:none\">{}</div>",
@@ -112,13 +112,15 @@ fn filter_kana(content: &str) -> String {
     BRACKET_RUBY_REGEX.replace_all(&result, "$2").to_string()
 }
 
-/// Simple hash function for generating unique IDs
-fn simple_hash(s: &str) -> u64 {
-    let mut hash: u64 = 0;
-    for byte in s.bytes() {
-        hash = hash.wrapping_mul(31).wrapping_add(byte as u64);
-    }
-    hash
+/// Generate a unique ID for hint elements using blake3 hash
+fn blake3_hash_id(s: &str) -> u64 {
+    let hash = blake3::hash(s.as_bytes());
+    let bytes = hash.as_bytes();
+    // Take first 8 bytes to form a u64
+    u64::from_le_bytes([
+        bytes[0], bytes[1], bytes[2], bytes[3],
+        bytes[4], bytes[5], bytes[6], bytes[7],
+    ])
 }
 
 /// Escape HTML special characters
