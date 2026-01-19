@@ -76,7 +76,7 @@ fn filter_type(content: &str) -> String {
     // and comparison logic on the answer side
     // For now, we generate a placeholder that can be processed by JS
     format!(r#"<input type="text" id="typeans" class="type-answer" data-expected="{}"/>"#,
-        html_escape(content))
+        htmlescape::encode_attribute(content))
 }
 
 /// Convert ruby annotations to full furigana display.
@@ -121,15 +121,6 @@ fn blake3_hash_id(s: &str) -> u64 {
         bytes[0], bytes[1], bytes[2], bytes[3],
         bytes[4], bytes[5], bytes[6], bytes[7],
     ])
-}
-
-/// Escape HTML special characters
-fn html_escape(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&#39;")
 }
 
 #[cfg(test)]
@@ -191,6 +182,23 @@ mod tests {
         let result = filter_type("<script>alert(1)</script>");
         assert!(result.contains("&lt;script&gt;"));
         assert!(!result.contains("<script>"));
+    }
+
+    #[test]
+    fn test_type_filter_escapes_edge_cases() {
+        // Test all special characters that need escaping in attributes
+        let result = filter_type("a & b < c > d \"quoted\" 'apostrophe'");
+        assert!(result.contains("&amp;"), "ampersand should be escaped");
+        assert!(result.contains("&lt;"), "less-than should be escaped");
+        assert!(result.contains("&gt;"), "greater-than should be escaped");
+        assert!(result.contains("&quot;"), "double quote should be escaped");
+        // Note: htmlescape may use &#x27; or &#39; for single quotes
+        assert!(
+            result.contains("&#x27;") || result.contains("&#39;"),
+            "single quote should be escaped"
+        );
+        // Ensure raw characters are not present
+        assert!(!result.contains("data-expected=\"a & b"));
     }
 
     // furigana filter tests
