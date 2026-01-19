@@ -120,3 +120,36 @@ Proto dependencies can be avoided entirely. The proto types are used for the gRP
 
 **Testing notes:**
 - All 27 tests pass (16 template + 8 cloze + 3 integration)
+
+---
+
+## Agent Session - Issue #5
+
+**Worked on:** Issue #5 - Implement Template Filters
+
+**What I did:**
+- Created `src/filters.rs` with all standard Anki filter implementations
+- Implemented `text` filter: strips HTML tags (preserves br as newlines)
+- Implemented `hint` filter: generates clickable reveal HTML elements
+- Implemented `type` filter: generates input field for answer comparison
+- Implemented `furigana` filter: converts bracket syntax to ruby HTML
+- Implemented `kanji` filter: extracts base characters from ruby annotations
+- Implemented `kana` filter: extracts readings from ruby annotations
+- Updated `template.rs` to apply filters in reverse order (right-to-left)
+- Integrated all filters with the template rendering pipeline
+- Added 20+ filter tests and 12 integration tests in template.rs
+- Fixed filter name parser to accept underscores in filter names
+
+**What I learned:**
+- Anki applies filters right-to-left: `{{text:hint:Field}}` means hint first, then text
+- Raw string literals (r#"..."#) have issues with single quotes in some contexts
+- Ruby HTML format: `<ruby>漢字<rt>かんじ</rt></ruby>`
+- Bracket ruby syntax: `漢字[かんじ]` is converted to HTML ruby
+
+**Codebase facts discovered:**
+- Filter names can contain alphanumeric, hyphen, and underscore characters
+- Unknown filters pass through gracefully (return content unchanged)
+- Cloze is handled separately since it needs ClozeContext for card ordinal
+
+**Testing notes:**
+- All 54 tests pass (20 filter + 28 template + 8 cloze + 4 integration)

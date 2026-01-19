@@ -44,6 +44,21 @@ cd pkg && npm pack
 - Answer side: revealed cloze shows text with `<span class="cloze">` wrapper
 - Use `{{cloze:FieldName}}` filter in templates
 
+## Template Filters
+
+Available filters in `src/filters.rs`:
+- `text` - strips HTML tags (converts `<br>` to newlines)
+- `hint` - generates clickable reveal element
+- `type` - generates input field for answer comparison
+- `furigana` - converts bracket syntax `漢字[かんじ]` to ruby HTML
+- `kanji` - extracts base text from ruby annotations
+- `kana` - extracts readings from ruby annotations
+
+Filter behavior:
+- Filters apply right-to-left: `{{text:hint:Field}}` applies hint first, then text
+- Unknown filters pass through unchanged (graceful fallback)
+- Filter names: alphanumeric, hyphen, underscore allowed
+
 ## Gotchas
 
 - The action is `dtolnay/rust-toolchain` not `rust-action`
