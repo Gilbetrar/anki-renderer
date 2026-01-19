@@ -22,6 +22,9 @@
 export type { NoteFields, CardTemplate, RenderOptions, RenderResult } from './types.js';
 export { RenderError } from './types.js';
 
+// Note: Web Component (AnkiCardPreview) is exported separately from 'anki-renderer/component'
+// to avoid loading DOM APIs in Node.js environments
+
 import type { RenderOptions, RenderResult } from './types.js';
 import { RenderError } from './types.js';
 

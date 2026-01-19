@@ -42,7 +42,34 @@ jobs:
       - name: Build WASM
         run: wasm-pack build --target web --out-dir pkg
 
-      - name: Verify package
+      - name: Verify WASM package
         run: |
           ls -la pkg/
           test -f pkg/anki_renderer_bg.wasm
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build Node.js WASM target
+        run: npm run build:wasm:node
+
+      - name: Build TypeScript
+        run: npm run build:ts
+
+      - name: TypeScript type check
+        run: npm run typecheck
+
+      - name: Run Jest tests
+        run: npm run test:js
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        run: npm run test:e2e

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anki Card Preview Test</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 1rem;
+    }
+    h1 {
+      color: #333;
+    }
+    .test-card {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      margin: 1rem 0;
+      overflow: hidden;
+    }
+    .test-card h3 {
+      background: #f5f5f5;
+      margin: 0;
+      padding: 0.5rem 1rem;
+      font-size: 0.9rem;
+      color: #666;
+    }
+    anki-card-preview {
+      display: block;
+      padding: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Anki Card Preview Component Tests</h1>
+
+  <div class="test-card">
+    <h3>Basic Card - Question Side</h3>
+    <anki-card-preview
+      id="basic-question"
+      template-front="{{Word}}"
+      template-back="{{Word}}<br>{{Definition}}"
+      fields='{"Word": "こんにちは", "Definition": "Hello"}'
+      side="question">
+    </anki-card-preview>
+  </div>
+
+  <div class="test-card">
+    <h3>Basic Card - Answer Side</h3>
+    <anki-card-preview
+      id="basic-answer"
+      template-front="{{Word}}"
+      template-back="{{FrontSide}}<hr>{{Definition}}"
+      fields='{"Word": "こんにちは", "Definition": "Hello"}'
+      side="answer">
+    </anki-card-preview>
+  </div>
+
+  <div class="test-card">
+    <h3>Cloze Card - Question Side</h3>
+    <anki-card-preview
+      id="cloze-question"
+      template-front="{{cloze:Text}}"
+      template-back="{{cloze:Text}}"
+      fields='{"Text": "{{c1::Paris}} is the capital of {{c2::France}}"}'
+      card-ordinal="1"
+      side="question">
+    </anki-card-preview>
+  </div>
+
+  <div class="test-card">
+    <h3>Cloze Card - Answer Side</h3>
+    <anki-card-preview
+      id="cloze-answer"
+      template-front="{{cloze:Text}}"
+      template-back="{{cloze:Text}}"
+      fields='{"Text": "{{c1::Paris}} is the capital of {{c2::France}}"}'
+      card-ordinal="1"
+      side="answer">
+    </anki-card-preview>
+  </div>
+
+  <div class="test-card">
+    <h3>With Hint Filter</h3>
+    <anki-card-preview
+      id="hint-card"
+      template-front="What is 2+2? {{hint:Hint}}"
+      template-back="{{FrontSide}}<hr>{{Answer}}"
+      fields='{"Hint": "Think of counting fingers", "Answer": "4"}'
+      side="question">
+    </anki-card-preview>
+  </div>
+
+  <div class="test-card">
+    <h3>Dynamic Card (for programmatic updates)</h3>
+    <anki-card-preview
+      id="dynamic-card"
+      template-front="{{Front}}"
+      template-back="{{Back}}"
+      fields='{"Front": "Initial question", "Back": "Initial answer"}'
+      side="question">
+    </anki-card-preview>
+    <button id="update-card" style="margin: 1rem;">Update Card</button>
+  </div>
+
+  <script type="module">
+    // Import component directly (auto-registers in browser)
+    import '../dist/component.js';
+
+    // Set up dynamic card update test
+    const dynamicCard = document.getElementById('dynamic-card');
+    const updateBtn = document.getElementById('update-card');
+
+    updateBtn.addEventListener('click', () => {
+      dynamicCard.setAttribute('fields', JSON.stringify({
+        Front: 'Updated question!',
+        Back: 'Updated answer!'
+      }));
+    });
+
+    // Log render events for debugging
+    document.querySelectorAll('anki-card-preview').forEach(card => {
+      card.addEventListener('render-complete', (e) => {
+        console.log('render-complete:', e.target.id, e.detail);
+      });
+      card.addEventListener('render-error', (e) => {
+        console.error('render-error:', e.target.id, e.detail);
+      });
+    });
+  </script>
+</body>
+</html>
