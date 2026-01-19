@@ -468,3 +468,27 @@ Proto dependencies can be avoided entirely. The proto types are used for the gRP
 **Mistakes made:** None
 
 **CI Status:** Success
+
+---
+
+## Agent Session - Issue #14
+
+**Worked on:** Issue #14 - Improve Parse Error Messages with Line/Column Info
+
+**What I did:**
+- Added nom_locate crate to track position during parsing
+- Updated all parser functions to use `Span<'a>` type (LocatedSpan wrapper)
+- Implemented `format_parse_error()` function that extracts line/column from spans
+- Updated `parse_template()` to generate user-friendly error messages
+- Added 5 tests verifying error positions on different lines
+
+**Codebase facts discovered:**
+- The parser uses nom combinators extensively
+- Filter chains are parsed with `recognize()` to capture full matched text, then split by colon
+- Conditional blocks use `take_until()` to find closing tags
+
+**Implementation details:**
+- Used `nom_locate::LocatedSpan` to wrap input with position tracking
+- Used `span.location_line()` and `span.get_utf8_column()` for position
+- Error messages now follow format: "Parse error at line X, column Y: description"
+- Fixed Rust lifetime elision warnings by using explicit `Span<'_>` syntax
