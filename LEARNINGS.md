@@ -144,4 +144,43 @@ npm run build:wasm:node  # Node target → pkg-node/
 npm run build:ts         # TypeScript → dist/
 npm run build            # All three
 npm run test:js          # Jest tests
+npm run test:e2e         # Playwright tests
+```
+
+## Web Component
+
+The `<anki-card-preview>` custom element renders cards in the browser:
+- Shadow DOM for style isolation
+- Auto-registers on import in browser environments
+- Events: `render-complete`, `render-error` with bubbles/composed true
+
+Attributes:
+- `template-front`, `template-back` - Template strings
+- `fields` - JSON object of field values
+- `side` - "question" or "answer"
+- `card-ordinal` - Cloze card number (1-indexed)
+- `css` - Custom CSS styles
+- `night-mode` - Boolean, dark theme
+- `default-styles` - Boolean, include Anki defaults
+
+## CSS Styling
+
+Structure:
+- `js/src/styles.ts` - CSS constants and utilities
+- `DEFAULT_ANKI_CSS` - Standard Anki card styles
+- `NIGHT_MODE_CSS` - Dark theme styles
+
+Key patterns:
+- Anki uses `.card` as root CSS selector
+- Night mode background: `#2f2f31` (dark gray)
+- Use `renderStyledCard()` for complete styled output
+- CSS dynamically injected into Shadow DOM via style element
+
+Style options:
+```typescript
+{
+  css: ".card { background: navy; }",  // Custom CSS
+  includeDefaultStyles: true,          // Add DEFAULT_ANKI_CSS
+  nightMode: true,                     // Add NIGHT_MODE_CSS + nightMode class
+}
 ```
