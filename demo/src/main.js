@@ -4,7 +4,7 @@
 
 // Dynamic import based on environment
 const isProduction = import.meta.env.PROD;
-const libPath = isProduction ? '/anki-renderer/lib/index.js' : '../../dist/index.js';
+const libPath = isProduction ? '/lib/index.js' : '../../dist/index.js';
 
 let renderCard, initWasm, DEFAULT_ANKI_CSS, NIGHT_MODE_CSS;
 

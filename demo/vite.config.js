@@ -30,14 +30,14 @@ function copyAssetsPlugin() {
           if (file.endsWith('.js')) {
             // Read file and fix import paths
             let content = readFileSync(resolve(distSrc, file), 'utf-8');
-            // Fix WASM import paths for GitHub Pages deployment
+            // Fix WASM import paths for production deployment
             content = content.replace(
               /import\(['"]\.\.\/\.\.\/pkg\/anki_renderer\.js['"]\)/g,
-              "import('/anki-renderer/pkg/anki_renderer.js')"
+              "import('/pkg/anki_renderer.js')"
             );
             content = content.replace(
               /import\(['"]\.\.\/\.\.\/pkg-node\/anki_renderer\.js['"]\)/g,
-              "import('/anki-renderer/pkg/anki_renderer.js')"
+              "import('/pkg/anki_renderer.js')"
             );
             writeFileSync(resolve(libOut, file), content);
           } else if (file.endsWith('.d.ts')) {
@@ -50,7 +50,7 @@ function copyAssetsPlugin() {
 }
 
 export default defineConfig({
-  base: '/anki-renderer/',
+  base: '/',
   build: {
     outDir: 'dist',
     rollupOptions: {
