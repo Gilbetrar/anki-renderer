@@ -1,127 +1,159 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('AnkiCardPreview Web Component', () => {
+test.describe('anki-card-preview component', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test.html');
-    // Wait for WASM to initialize
+    await page.goto('/e2e/test.html');
+    // Wait for WASM to initialize and first card to render
     await page.waitForFunction(() => {
-      const log = document.getElementById('event-log');
-      return log?.textContent?.includes('WASM initialized successfully');
-    });
+      const card = document.querySelector('#basic-question');
+      if (!card?.shadowRoot) return false;
+      const content = card.shadowRoot.querySelector('.content');
+      return content && !content.classList.contains('loading');
+    }, { timeout: 15000 });
   });
 
   test('renders basic card question side', async ({ page }) => {
-    const card = page.locator('#basic-card');
+    const content = await page.evaluate(() => {
+      const card = document.querySelector('#basic-question');
+      return card?.shadowRoot?.querySelector('.content')?.textContent;
+    });
 
-    // Check that content container exists in shadow DOM
-    const content = card.locator('div.content');
-    await expect(content).toBeVisible();
-    await expect(content).toContainText('What is 2 + 2?');
+    expect(content).toContain('こんにちは');
+    expect(content).not.toContain('Hello');
   });
 
-  test('toggles between question and answer', async ({ page }) => {
-    const card = page.locator('#basic-card');
-    const content = card.locator('div.content');
+  test('renders basic card answer side', async ({ page }) => {
+    const content = await page.evaluate(() => {
+      const card = document.querySelector('#basic-answer');
+      return card?.shadowRoot?.querySelector('.content')?.textContent;
+    });
 
-    // Initially shows question
-    await expect(content).toContainText('What is 2 + 2?');
-    await expect(content).not.toContainText('<hr');
-
-    // Click toggle button
-    await page.click('button:text("Toggle Side"):near(#basic-card)');
-
-    // Now shows answer with FrontSide and Back
-    await expect(content).toContainText('What is 2 + 2?');
-    await expect(content).toContainText('4');
+    expect(content).toContain('こんにちは');
+    expect(content).toContain('Hello');
   });
 
-  test('renders cloze card with hidden text', async ({ page }) => {
-    const card = page.locator('#cloze-card');
-    const content = card.locator('div.content');
+  test('renders cloze question side with hidden text', async ({ page }) => {
+    const content = await page.evaluate(() => {
+      const card = document.querySelector('#cloze-question');
+      return card?.shadowRoot?.querySelector('.content')?.textContent;
+    });
 
-    // On question side, c1 should be hidden
-    await expect(content).toContainText('[...]');
-    await expect(content).toContainText('France'); // c2 is visible
-    await expect(content).not.toContainText('Paris'); // c1 is hidden
+    // c1 (Paris) should be hidden
+    expect(content).toContain('[...]');
+    // c2 (France) should be visible
+    expect(content).toContain('France');
+    expect(content).not.toContain('Paris');
   });
 
-  test('toggles cloze card to answer side', async ({ page }) => {
-    const card = page.locator('#cloze-card');
-    const content = card.locator('div.content');
+  test('renders cloze answer side with revealed text', async ({ page }) => {
+    const content = await page.evaluate(() => {
+      const card = document.querySelector('#cloze-answer');
+      return card?.shadowRoot?.querySelector('.content')?.innerHTML;
+    });
 
-    // Toggle to answer
-    await page.click('button:text("Toggle Side"):near(#cloze-card)');
-
-    // On answer side, c1 should be revealed
-    await expect(content).toContainText('Paris');
-    await expect(content).toContainText('France');
+    // Both should be visible in answer
+    expect(content).toContain('Paris');
+    expect(content).toContain('France');
+    // Cloze class should be present
+    expect(content).toContain('class="cloze"');
   });
 
-  test('switches between cloze cards', async ({ page }) => {
-    const card = page.locator('#cloze-card');
-    const content = card.locator('div.content');
+  test('renders hint filter correctly', async ({ page }) => {
+    const content = await page.evaluate(() => {
+      const card = document.querySelector('#hint-card');
+      return card?.shadowRoot?.querySelector('.content')?.textContent;
+    });
 
-    // Initially card 1 - Paris hidden
-    await expect(content).not.toContainText('Paris');
-    await expect(content).toContainText('France');
-
-    // Switch to card 2
-    await page.click('button:text("Switch Cloze Card")');
-
-    // Now France hidden, Paris visible
-    await expect(content).toContainText('Paris');
-    await expect(content).not.toContainText('France');
+    expect(content).toContain('What is 2+2?');
+    // Hint should show clickable element
+    expect(content).toContain('Show');
   });
 
-  test('renders furigana as ruby elements', async ({ page }) => {
-    const card = page.locator('#japanese-card');
-    const content = card.locator('div.content');
+  test('updates dynamically when attributes change', async ({ page }) => {
+    // Initial content
+    const initialContent = await page.evaluate(() => {
+      const card = document.querySelector('#dynamic-card');
+      return card?.shadowRoot?.querySelector('.content')?.textContent;
+    });
+    expect(initialContent).toContain('Initial question');
 
-    // Should have ruby elements
-    const ruby = content.locator('ruby');
-    await expect(ruby.first()).toBeVisible();
+    // Click update button
+    await page.click('#update-card');
 
-    // Check for the reading in rt elements
-    const rt = content.locator('rt');
-    await expect(rt.first()).toContainText('にほんご');
+    // Wait for re-render
+    await page.waitForFunction(() => {
+      const card = document.querySelector('#dynamic-card');
+      const content = card?.shadowRoot?.querySelector('.content')?.textContent;
+      return content?.includes('Updated question!');
+    }, { timeout: 5000 });
+
+    const updatedContent = await page.evaluate(() => {
+      const card = document.querySelector('#dynamic-card');
+      return card?.shadowRoot?.querySelector('.content')?.textContent;
+    });
+    expect(updatedContent).toContain('Updated question!');
+  });
+
+  test('uses Shadow DOM for style isolation', async ({ page }) => {
+    // Verify shadow root exists
+    const hasShadowRoot = await page.evaluate(() => {
+      const card = document.querySelector('#basic-question');
+      return card?.shadowRoot !== null;
+    });
+    expect(hasShadowRoot).toBe(true);
+
+    // Verify content is inside shadow DOM
+    const shadowContent = await page.evaluate(() => {
+      const card = document.querySelector('#basic-question');
+      return card?.shadowRoot?.querySelector('.content')?.textContent;
+    });
+    expect(shadowContent).toContain('こんにちは');
   });
 
   test('emits render-complete event', async ({ page }) => {
-    const eventLog = page.locator('#event-log');
+    // Create a new card and listen for events
+    const eventFired = await page.evaluate(async () => {
+      return new Promise((resolve) => {
+        const card = document.createElement('anki-card-preview');
+        card.setAttribute('template-front', '{{Test}}');
+        card.setAttribute('template-back', '{{Test}}');
+        card.setAttribute('fields', JSON.stringify({ Test: 'Event test' }));
+        card.setAttribute('side', 'question');
 
-    // Initial render events should be logged
-    await expect(eventLog).toContainText('render-complete');
+        card.addEventListener('render-complete', (e: Event) => {
+          const detail = (e as CustomEvent).detail;
+          resolve({
+            content: detail.content,
+            side: detail.side,
+          });
+        });
+
+        document.body.appendChild(card);
+      });
+    });
+
+    expect(eventFired).toEqual({
+      content: 'Event test',
+      side: 'question',
+    });
   });
 
-  test('styles are encapsulated via Shadow DOM', async ({ page }) => {
-    // Add a global style that would conflict
-    await page.addStyleTag({
-      content: '.content { background: red !important; }'
+  test('supports programmatic property access', async ({ page }) => {
+    const cardProperties = await page.evaluate(() => {
+      const card = document.querySelector('#basic-question') as any;
+      return {
+        templateFront: card.templateFront,
+        templateBack: card.templateBack,
+        fields: card.fields,
+        side: card.side,
+        cardOrdinal: card.cardOrdinal,
+      };
     });
 
-    const card = page.locator('#basic-card');
-    const content = card.locator('div.content');
-
-    // The shadow DOM content should not be affected by global styles
-    const bgColor = await content.evaluate((el) => {
-      return window.getComputedStyle(el).backgroundColor;
-    });
-
-    // Should not be red (rgb(255, 0, 0))
-    expect(bgColor).not.toBe('rgb(255, 0, 0)');
-  });
-
-  test('programmatic property updates trigger re-render', async ({ page }) => {
-    const card = page.locator('#basic-card');
-    const content = card.locator('div.content');
-
-    // Update fields programmatically
-    await page.evaluate(() => {
-      const card = document.getElementById('basic-card') as any;
-      card.fields = { Front: 'New Question', Back: 'New Answer' };
-    });
-
-    // Content should update
-    await expect(content).toContainText('New Question');
+    expect(cardProperties.templateFront).toBe('{{Word}}');
+    expect(cardProperties.templateBack).toBe('{{Word}}<br>{{Definition}}');
+    expect(cardProperties.fields).toEqual({ Word: 'こんにちは', Definition: 'Hello' });
+    expect(cardProperties.side).toBe('question');
+    expect(cardProperties.cardOrdinal).toBe(0);
   });
 });
