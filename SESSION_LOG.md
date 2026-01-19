@@ -340,3 +340,31 @@ Proto dependencies can be avoided entirely. The proto types are used for the gRP
 **What remains for issue #9:**
 - User needs to enable GitHub Pages in repository settings
 - Consider adding Playwright test for demo site (verification criteria)
+
+---
+
+## Agent Session - Iteration 15
+
+**Worked on:** Verifying issue #7/#8 completion and issue #9 demo progress
+
+**What I found:**
+- Issues #7 (Web Component) and #8 (CSS Styling) are already closed
+- Issue #9 (Demo Site) work was already committed by previous iterations
+- Demo site builds successfully with Vite
+- Deploy workflow fails because GitHub Pages needs manual enabling
+
+**Actions taken:**
+- Verified e2e tests pass (9 tests)
+- Verified all checks pass (typecheck, lint, tests, build)
+- Verified demo builds correctly
+- Waited for CI to complete
+
+**CI Status:** 
+- Main CI: Success
+- Deploy workflow: Failed (expected - GitHub Pages not enabled)
+
+**Next steps for issue #9:**
+1. User needs to enable GitHub Pages: Repository Settings → Pages → Source: GitHub Actions
+2. Once enabled, the deploy workflow will automatically publish the demo
+
+**Remaining open issues:** #9 (needs manual config), #10 (NPM Publication)
