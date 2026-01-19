@@ -40,6 +40,7 @@ cd pkg && npm pack
 
 - The action is `dtolnay/rust-toolchain` not `rust-action`
 - wasm-pack installer script requires rustup to be visible in PATH
+- `JsError::new()` only works in WASM - use native error types for non-WASM tests
 
 ## rslib Dependency Analysis (Issue #2)
 

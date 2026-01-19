@@ -59,3 +59,34 @@ Raw session history for debugging. Don't read this file for context - use LEARNI
 
 **Key insight:**
 Proto dependencies can be avoided entirely. The proto types are used for the gRPC service layer, but the core rendering functions accept plain Rust types. We can define our own simple types for the WASM interface.
+
+---
+
+## Agent Session - Issue #3 (Partial)
+
+**Worked on:** Issue #3 - Implement Template Parser
+
+**What I did:**
+- Added dependencies: nom (parser combinator), serde, serde_json
+- Created `src/template.rs` with complete template parsing and rendering
+- Implemented field substitution: `{{FieldName}}`
+- Implemented positive conditionals: `{{#Field}}...{{/Field}}`
+- Implemented negative conditionals: `{{^Field}}...{{/Field}}`
+- Implemented filter syntax parsing: `{{filter:FieldName}}`
+- Handled special fields: FrontSide, Tags, Deck, Card
+- Wired up render_template function in lib.rs
+- Added 16 comprehensive tests
+- All acceptance criteria met except structured AST return (returns rendered HTML)
+
+**What I learned:**
+- JsError::new() only works in WASM target, not native Rust tests
+- nom's take_until requires the exact string to search for
+- Filter application deferred to Issue #5 (filters are parsed but not applied)
+
+**Codebase facts discovered:**
+- Template syntax follows Mustache pattern with Anki extensions
+- Fields can have spaces in names (e.g., "Front Side")
+- Conditionals check for non-empty values, not truthy/falsy
+
+**Remaining for Issue #3:**
+- Consider adding AST export for debugging/tooling
