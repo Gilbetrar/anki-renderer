@@ -10,6 +10,9 @@ Cargo.lock
 node_modules/
 *.tgz
 
+# TypeScript build output
+/dist/
+
 # IDE
 .idea/
 .vscode/

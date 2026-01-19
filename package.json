@@ -2,19 +2,34 @@
   "name": "anki-renderer",
   "version": "0.1.0",
   "description": "Anki card template renderer compiled to WebAssembly",
-  "main": "pkg/anki_renderer.js",
-  "types": "pkg/anki_renderer.d.ts",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./pkg/*": "./pkg/*"
+  },
   "files": [
-    "pkg/"
+    "dist/",
+    "pkg/",
+    "pkg-node/"
   ],
   "scripts": {
-    "build": "wasm-pack build --target web --out-dir pkg",
-    "build:node": "wasm-pack build --target nodejs --out-dir pkg-node",
+    "build:wasm": "wasm-pack build --target web --out-dir pkg",
+    "build:wasm:node": "wasm-pack build --target nodejs --out-dir pkg-node",
+    "build:ts": "tsc -p js/tsconfig.json",
+    "build": "npm run build:wasm && npm run build:wasm:node && npm run build:ts",
     "test": "cargo test",
     "test:wasm": "wasm-pack test --headless --chrome",
-    "typecheck": "echo 'No TypeScript to check yet'",
+    "test:js": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "typecheck": "tsc -p js/tsconfig.json --noEmit",
     "lint": "cargo clippy -- -D warnings",
-    "clean": "cargo clean && rm -rf pkg pkg-node"
+    "clean": "cargo clean && rm -rf pkg pkg-node dist"
   },
   "repository": {
     "type": "git",
@@ -34,5 +49,11 @@
     "url": "https://github.com/Gilbetrar/anki-renderer/issues"
   },
   "homepage": "https://github.com/Gilbetrar/anki-renderer#readme",
-  "devDependencies": {}
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.0",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.0",
+    "ts-jest": "^29.1.0"
+  }
 }
