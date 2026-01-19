@@ -310,3 +310,33 @@ Proto dependencies can be avoided entirely. The proto types are used for the gRP
 **Time spent:** Mostly waiting for CI and observing parallel agent progress
 
 **Remaining work:** Issues #9 (Demo Site & Documentation) and #10 (NPM Package Publication)
+
+---
+
+## Agent Session - Issue #9 (Demo Site)
+
+**Worked on:** Issue #9 - Demo Site & Documentation
+
+**What I did:**
+- Created Vite-based demo site in `/demo` directory
+- Built live template editor with real-time preview
+- Added example cards: basic, cloze, hint, furigana, styled, filters
+- Integrated CSS styling support (default styles, night mode, custom CSS)
+- Created API documentation with code examples
+- Set up GitHub Actions workflow for GitHub Pages deployment
+- Fixed WASM import paths for production build (relative → absolute)
+
+**Technical details:**
+- Demo uses dynamic import to load library with environment-aware paths
+- Vite plugin copies pkg/ and dist/ files to demo build output
+- Path rewriting fixes relative imports to absolute GitHub Pages paths
+
+**Issues encountered:**
+- Deploy workflow failed because GitHub Pages isn't enabled yet on repo
+- Requires manual setup: Repository Settings → Pages → Source: GitHub Actions
+
+**CI Status:** Passed (deploy needs manual repo config)
+
+**What remains for issue #9:**
+- User needs to enable GitHub Pages in repository settings
+- Consider adding Playwright test for demo site (verification criteria)
