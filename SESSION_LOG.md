@@ -292,3 +292,21 @@ Proto dependencies can be avoided entirely. The proto types are used for the gRP
 **Testing notes:**
 - 54 Rust tests + 40 Jest tests + 9 Playwright e2e tests all pass
 - CI passes
+
+---
+
+## Agent Session - Observation
+
+**Iteration:** 7
+
+**What happened:**
+- Started to work on issue #7 (Web Component Wrapper)
+- Created `web-component.ts` but discovered `component.ts` already existed (created by parallel agent)
+- Removed duplicate file
+- Observed multiple parallel agents completing issues #7 and #8 while I waited for CI
+- CI passed for all commits
+- Issues #7 and #8 now closed, issues #9 and #10 remain open
+
+**Time spent:** Mostly waiting for CI and observing parallel agent progress
+
+**Remaining work:** Issues #9 (Demo Site & Documentation) and #10 (NPM Package Publication)
