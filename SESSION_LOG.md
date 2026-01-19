@@ -368,3 +368,42 @@ Proto dependencies can be avoided entirely. The proto types are used for the gRP
 2. Once enabled, the deploy workflow will automatically publish the demo
 
 **Remaining open issues:** #9 (needs manual config), #10 (NPM Publication)
+
+---
+
+## Agent Session - Issue #11
+
+**Worked on:** Issue #11 - Verify Anki Version Alignment
+
+**What I did:**
+- Cloned latest Anki repo (shallow clone) to `/tmp/anki-latest`
+- Identified current version: commit `b8884bac` (January 2026)
+- Analyzed rslib files: template.rs, template_filters.rs, cloze.rs, card_rendering/*
+- Compared against our implementation in src/template.rs, src/filters.rs, src/cloze.rs
+- Documented version compatibility and known limitations in LEARNINGS.md
+
+**What I learned:**
+- Anki's cloze implementation is much more sophisticated:
+  - Multi-card cloze syntax `{{c1,2,3::text}}` 
+  - Nested clozes supported
+  - Image occlusion integration
+  - data-cloze/data-ordinal HTML attributes
+  - MathJax handling inside clozes
+- Anki uses blake3 for hint IDs (we use simple hash)
+- Anki uses htmlescape crate (we do manual escaping)
+- Anki has `cloze-only` filter we don't support
+- Legacy `<%...%>` template syntax exists in Anki
+
+**Key differences documented:**
+- Our implementation covers core features (field substitution, conditionals, basic cloze, core filters)
+- Known limitations are acceptable for card preview use case
+- Issues #12-14 address some gaps (blake3, htmlescape, error messages)
+
+**Codebase facts discovered:**
+- Anki's card_rendering module is separate from template module
+- TTS support uses `[anki:tts...]` syntax, not `{{...}}`
+- Sound/video tags use `[sound:...]` syntax
+
+**Mistakes made:** None
+
+**CI Status:** Awaiting verification
