@@ -524,3 +524,42 @@ Proto dependencies can be avoided entirely. The proto types are used for the gRP
 - Web component in separate entry point to support server-side rendering
 
 **CI Status:** Success
+
+---
+
+## Agent Session - Issue #10 (Part 1)
+
+**Worked on:** Issue #10 - NPM Package Publication (packaging preparation)
+
+**What I did:**
+- Identified that pkg/ and pkg-node/ were being excluded from npm pack due to wasm-pack's .gitignore files containing `*`
+- Created .npmignore to control which files are included in the published package
+- Discovered import path issue: TypeScript sources use `../../pkg/` (from js/src/) but compiled output needs `../pkg/` (from dist/)
+- Created scripts/postbuild.js to:
+  1. Remove .gitignore files from pkg/ and pkg-node/ after wasm-pack build
+  2. Transform import paths in dist/index.js from `../../pkg/` to `../pkg/`
+- Updated package.json with postbuild and prepublishOnly scripts
+- Verified package works when installed locally via npm pack + test project
+- All tests pass (Rust 60 tests, Jest 40 tests, Playwright 9 tests)
+- Package size: 778.6 kB (mostly from two 1 MB WASM files)
+
+**What I learned:**
+- wasm-pack creates .gitignore files with `*` in output directories to prevent git tracking
+- npm uses .gitignore for exclusion when .npmignore doesn't exist
+- TypeScript doesn't transform import paths during compilation - paths are preserved as-is
+- Dynamic imports with relative paths need careful handling for different execution contexts
+- Jest's moduleNameMapper doesn't work with dynamic imports
+- Using postbuild scripts to transform paths after TypeScript compilation is a clean solution
+
+**Key files created/modified:**
+- `.npmignore` - Controls files included in published package
+- `scripts/postbuild.js` - Handles post-build path transformations
+- `package.json` - Added postbuild and prepublishOnly scripts
+- `js/src/index.ts` - Added comments explaining path transformation
+
+**Remaining for issue #10:**
+- TypeScript types verification for consumers
+- Browser testing (Vite/webpack bundler compatibility)
+- Actual NPM publication
+
+**CI Status:** Success
