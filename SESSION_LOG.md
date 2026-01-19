@@ -187,3 +187,32 @@ Proto dependencies can be avoided entirely. The proto types are used for the gRP
 **Testing notes:**
 - 54 Rust tests + 19 JavaScript tests all pass
 - CI workflow passes
+
+---
+
+## Agent Session - Issue #7
+
+**Worked on:** Issue #7 - Web Component Wrapper
+
+**What I did:**
+- Verified existing web component implementation in `js/src/component.ts`
+- Ran all local checks (typecheck, lint, test, build) - all passed
+- Ran Playwright tests (10 tests) - all passed
+- Updated CI workflow to include Node.js setup, TypeScript build, Jest tests, and Playwright tests
+- Added `.gitignore` entries for `/playwright-report/` and `/test-results/`
+- Committed and pushed the web component implementation with CI updates
+
+**What I learned:**
+- Web components use Shadow DOM via `attachShadow({ mode: 'open' })`
+- Custom elements observe attributes via `static get observedAttributes()`
+- Events use `CustomEvent` with `bubbles: true, composed: true` to cross shadow DOM
+- Playwright tests work well with Shadow DOM content via `locator().locator()` pattern
+
+**Codebase facts discovered:**
+- Component registers automatically on import in browser environment
+- The `registerComponent()` function can be called explicitly for manual control
+- Test HTML file at `/e2e/test.html` serves as both test fixture and demo
+
+**Testing notes:**
+- 54 Rust tests + 24 JavaScript tests + 10 Playwright e2e tests all pass
+- CI workflow updated to run full JS/TS pipeline including Playwright
