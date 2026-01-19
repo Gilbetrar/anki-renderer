@@ -9,7 +9,11 @@ use nom::{
     sequence::{delimited, pair},
     IResult,
 };
+use nom_locate::LocatedSpan;
 use std::collections::HashMap;
+
+/// Input type with position tracking
+type Span<'a> = LocatedSpan<&'a str>;
 
 /// A parsed template node
 #[derive(Debug, Clone, PartialEq)]
@@ -30,12 +34,12 @@ pub enum TemplateNode {
 }
 
 /// Parse a field name (alphanumeric, spaces, and underscores)
-fn field_name(input: &str) -> IResult<&str, &str> {
+fn field_name(input: Span) -> IResult<Span, Span> {
     take_while1(|c: char| c.is_alphanumeric() || c == '_' || c == ' ')(input)
 }
 
 /// Parse filter chain: filter1:filter2:FieldName
-fn filter_chain(input: &str) -> IResult<&str, (Vec<&str>, &str)> {
+fn filter_chain(input: Span<'_>) -> IResult<Span<'_>, (Vec<&str>, &str)> {
     let (input, parts) = recognize(pair(
         many0(pair(
             take_while1(|c: char| c.is_alphanumeric() || c == '-' || c == '_'),
@@ -44,7 +48,7 @@ fn filter_chain(input: &str) -> IResult<&str, (Vec<&str>, &str)> {
         field_name,
     ))(input)?;
 
-    let segments: Vec<&str> = parts.split(':').collect();
+    let segments: Vec<&str> = parts.fragment().split(':').collect();
     if segments.len() > 1 {
         let filters = segments[..segments.len() - 1].to_vec();
         let name = segments[segments.len() - 1];
@@ -55,7 +59,7 @@ fn filter_chain(input: &str) -> IResult<&str, (Vec<&str>, &str)> {
 }
 
 /// Parse a field substitution: {{FieldName}} or {{filter:FieldName}}
-fn parse_field(input: &str) -> IResult<&str, TemplateNode> {
+fn parse_field(input: Span) -> IResult<Span, TemplateNode> {
     let (input, (filters, name)) = delimited(tag("{{"), filter_chain, tag("}}"))(input)?;
 
     Ok((
@@ -68,16 +72,16 @@ fn parse_field(input: &str) -> IResult<&str, TemplateNode> {
 }
 
 /// Parse a conditional open tag: {{#Field}} or {{^Field}}
-fn parse_conditional_open(input: &str) -> IResult<&str, (bool, &str)> {
+fn parse_conditional_open(input: Span<'_>) -> IResult<Span<'_>, (bool, &str)> {
     let (input, _) = tag("{{")(input)?;
     let (input, neg) = alt((map(char('#'), |_| false), map(char('^'), |_| true)))(input)?;
     let (input, name) = field_name(input)?;
     let (input, _) = tag("}}")(input)?;
-    Ok((input, (neg, name)))
+    Ok((input, (neg, *name.fragment())))
 }
 
 /// Parse a complete conditional block
-fn parse_conditional(input: &str) -> IResult<&str, TemplateNode> {
+fn parse_conditional(input: Span) -> IResult<Span, TemplateNode> {
     let (input, (is_negative, field)) = parse_conditional_open(input)?;
     let close_tag = format!("{{{{/{}}}}}", field);
 
@@ -99,40 +103,70 @@ fn parse_conditional(input: &str) -> IResult<&str, TemplateNode> {
 }
 
 /// Parse plain text (everything up to the next {{ or end)
-fn parse_text(input: &str) -> IResult<&str, TemplateNode> {
+fn parse_text(input: Span) -> IResult<Span, TemplateNode> {
     let (input, text) = alt((take_until("{{"), nom::combinator::rest))(input)?;
 
-    if text.is_empty() {
+    if text.fragment().is_empty() {
         Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::TakeWhile1,
         )))
     } else {
-        Ok((input, TemplateNode::Text(text.to_string())))
+        Ok((input, TemplateNode::Text(text.fragment().to_string())))
     }
 }
 
 /// Parse a single template node
-fn parse_node(input: &str) -> IResult<&str, TemplateNode> {
+fn parse_node(input: Span) -> IResult<Span, TemplateNode> {
     alt((parse_conditional, parse_field, parse_text))(input)
 }
 
 /// Parse all template nodes
-fn parse_template_nodes(input: &str) -> IResult<&str, Vec<TemplateNode>> {
+fn parse_template_nodes(input: Span) -> IResult<Span, Vec<TemplateNode>> {
     many0(parse_node)(input)
+}
+
+/// Format a parse error with line and column information
+fn format_parse_error(span: Span, description: &str) -> String {
+    let line = span.location_line();
+    let column = span.get_utf8_column();
+    format!(
+        "Parse error at line {}, column {}: {}",
+        line, column, description
+    )
 }
 
 /// Parse a template string into nodes
 pub fn parse_template(template: &str) -> Result<Vec<TemplateNode>, String> {
-    match parse_template_nodes(template) {
+    let input = Span::new(template);
+    match parse_template_nodes(input) {
         Ok((remaining, nodes)) => {
-            if !remaining.is_empty() {
-                Err(format!("Failed to parse remaining: {}", remaining))
+            if !remaining.fragment().is_empty() {
+                Err(format_parse_error(
+                    remaining,
+                    &format!("unexpected content: {}", remaining.fragment()),
+                ))
             } else {
                 Ok(nodes)
             }
         }
-        Err(e) => Err(format!("Parse error: {:?}", e)),
+        Err(e) => {
+            match e {
+                nom::Err::Error(err) | nom::Err::Failure(err) => {
+                    let description = match err.code {
+                        nom::error::ErrorKind::Tag => "expected closing braces '}}' or valid tag",
+                        nom::error::ErrorKind::TakeUntil => "unclosed tag or missing closing tag",
+                        nom::error::ErrorKind::Char => "unexpected character",
+                        nom::error::ErrorKind::TakeWhile1 => "expected field name",
+                        _ => "invalid template syntax",
+                    };
+                    Err(format_parse_error(err.input, description))
+                }
+                nom::Err::Incomplete(_) => {
+                    Err("Parse error: incomplete input".to_string())
+                }
+            }
+        }
     }
 }
 
@@ -439,5 +473,50 @@ mod tests {
             }
             _ => panic!("Expected Field node"),
         }
+    }
+
+    // Error message tests
+    #[test]
+    fn test_error_includes_line_column_for_unclosed_conditional() {
+        let result = parse_template("{{#Field}");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("line 1"));
+        assert!(err.contains("column"));
+    }
+
+    #[test]
+    fn test_error_position_on_second_line() {
+        let result = parse_template("Valid text\n{{#Field}");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("line 2"));
+    }
+
+    #[test]
+    fn test_error_position_for_missing_close_braces() {
+        let result = parse_template("Hello {{Name");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("line 1"));
+        assert!(err.contains("column"));
+    }
+
+    #[test]
+    fn test_error_position_for_unclosed_conditional_block() {
+        let result = parse_template("{{#Field}}content but no close");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("line 1"));
+    }
+
+    #[test]
+    fn test_error_message_format() {
+        // Verify the error message follows the expected format
+        let result = parse_template("{{#Bad}");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        // Should match: "Parse error at line X, column Y: description"
+        assert!(err.starts_with("Parse error at line "));
     }
 }
