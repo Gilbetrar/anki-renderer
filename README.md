@@ -90,6 +90,21 @@ npm install
 npm run dev         # Start dev server at localhost:3001
 ```
 
+## Publishing to npm
+
+```bash
+# Build the package
+npm run build
+
+# Login to npm (if not already)
+npm login
+
+# Publish
+npm publish
+```
+
+For subsequent releases, update the version in `package.json` before publishing.
+
 ## Documentation
 
 See [LEARNINGS.md](./LEARNINGS.md) for detailed documentation on:
