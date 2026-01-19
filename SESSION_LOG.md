@@ -90,3 +90,33 @@ Proto dependencies can be avoided entirely. The proto types are used for the gRP
 
 **Remaining for Issue #3:**
 - Consider adding AST export for debugging/tooling
+
+---
+
+## Agent Session - Issue #4
+
+**Worked on:** Issue #4 - Implement Cloze Deletion Support
+
+**What I did:**
+- Closed Issue #3 (all acceptance criteria were already met)
+- Created `src/cloze.rs` with cloze parsing and rendering logic
+- Used regex for cloze pattern matching: `{{c1::text}}` and `{{c1::text::hint}}`
+- Implemented question side rendering (cloze hidden with `[...]` or `[hint]`)
+- Implemented answer side rendering (cloze revealed with styling)
+- Added `render_cloze_card()` WASM function for front/back rendering
+- Added `count_cloze_cards()` utility function
+- Integrated cloze filter with template renderer via `{{cloze:FieldName}}`
+- Updated `render_nodes` to accept optional `ClozeContext`
+- Added 11 tests for cloze functionality
+
+**What I learned:**
+- Cloze output uses `<span class="cloze">` for styling
+- Card ordinal is 1-indexed (c1 = card 1, c2 = card 2)
+- LazyLock is the modern way to create static regex in Rust
+
+**Codebase facts discovered:**
+- Template filters are applied by checking the `filters` vec in TemplateNode::Field
+- Multiple clozes with same ordinal (c1) are all hidden/revealed together
+
+**Testing notes:**
+- All 27 tests pass (16 template + 8 cloze + 3 integration)

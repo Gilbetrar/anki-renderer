@@ -36,6 +36,14 @@ cd pkg && npm pack
 - Prefix unused parameters with `_` to avoid lint warnings
 - `JsError` is the WASM-compatible error type
 
+## Cloze Implementation
+
+- Cloze syntax: `{{c1::text}}` or `{{c1::text::hint}}`
+- Card ordinal is 1-indexed (c1 = card 1, c2 = card 2)
+- Question side: hidden cloze shows `[...]` or `[hint]`
+- Answer side: revealed cloze shows text with `<span class="cloze">` wrapper
+- Use `{{cloze:FieldName}}` filter in templates
+
 ## Gotchas
 
 - The action is `dtolnay/rust-toolchain` not `rust-action`
