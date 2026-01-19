@@ -435,3 +435,36 @@ Proto dependencies can be avoided entirely. The proto types are used for the gRP
 **Mistakes made:** None
 
 **CI Status:** Success
+
+---
+
+## Agent Session - Issue #13
+
+**Worked on:** Issue #13 - Use htmlescape Crate for HTML Escaping
+
+**What I did:**
+- Added `htmlescape = "0.3"` dependency to Cargo.toml
+- Replaced manual `html_escape()` function with `htmlescape::encode_attribute()` in `src/filters.rs`
+- Removed the 8-line manual implementation
+- Added comprehensive test `test_type_filter_escapes_edge_cases` covering:
+  - Ampersand (`&`) → `&amp;`
+  - Less-than (`<`) → `&lt;`
+  - Greater-than (`>`) → `&gt;`
+  - Double quote (`"`) → `&quot;`
+  - Single quote (`'`) → `&#x27;` or `&#39;`
+- All 55 Rust tests pass
+- CI passed successfully
+
+**What I learned:**
+- `htmlescape::encode_attribute()` handles all HTML attribute escaping needs
+- The crate uses `&#x27;` for single quotes (hexadecimal notation)
+- The manual implementation used `&#39;` (decimal notation) - both are valid
+- Test needs to check for either format for portability
+
+**Codebase facts discovered:**
+- `html_escape()` was only used in the `filter_type()` function for data-expected attribute
+- The `type` filter creates an input element for type-in answers
+
+**Mistakes made:** None
+
+**CI Status:** Success
