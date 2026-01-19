@@ -1,0 +1,36 @@
+# Source files (not needed in published package)
+/src/
+/js/
+/e2e/
+/demo/
+/infra/
+
+# Rust build artifacts
+/target/
+Cargo.toml
+Cargo.lock
+
+# Dev files
+/.github/
+/tests/
+*.md
+!README.md
+jest.config.js
+playwright.config.ts
+tsconfig.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+SIGNAL.txt
+
+# Test artifacts
+/playwright-report/
+/test-results/
+*.tgz

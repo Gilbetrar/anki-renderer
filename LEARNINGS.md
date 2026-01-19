@@ -57,21 +57,10 @@ cd demo && npm run build
 ## AWS Deployment
 
 **Live site**: https://anki-renderer.bjblabs.com
-
-| Resource | Value |
-|----------|-------|
-| S3 Bucket | `anki-renderer-demo-719390918663` |
-| CloudFront | `E7ZBUOH7HRPA5` |
-| CDK Stack | `AnkiRendererDemoStack` |
-
-**Deploy flow**: Push to main → CI → deploy workflow → CDK deploy
-
-```bash
-# Manual deploy
-cd infra && npm install && npx cdk deploy
-```
-
-**GitHub Actions auth**: OIDC via `github-actions-anki-renderer` IAM role (secret: `AWS_ROLE_ARN`)
+**Stack**: `AnkiRendererDemoStack` (S3 `anki-renderer-demo-719390918663`, CloudFront `E7ZBUOH7HRPA5`)
+**Deploy**: Push to main → CI → deploy workflow → CDK deploy
+**Manual**: `cd infra && npm install && npx cdk deploy`
+**Auth**: OIDC via `github-actions-anki-renderer` IAM role (secret: `AWS_ROLE_ARN`)
 
 ## Anki Version Compatibility
 
@@ -88,13 +77,9 @@ cd infra && npm install && npx cdk deploy
 - Multi-card cloze syntax `{{c1,2::shared}}` not supported
 - Nested clozes not supported
 - Image occlusion clozes not supported
-- HTML comments `<!--...-->` not stripped/parsed
-- Legacy alt syntax `<%...%>` not supported
-- `cloze-only` filter missing
-- TTS filter missing (`[anki:tts...]`)
-- Different hint ID generation (simple hash vs blake3)
+- `cloze-only` filter missing, TTS filter missing
 - Cloze output lacks `data-cloze`/`data-ordinal` attributes
-- Manual HTML escaping vs `htmlescape` crate
+- Legacy alt syntax `<%...%>` not supported
 
 These limitations are acceptable for the core use case of rendering card previews.
 

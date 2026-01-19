@@ -80,6 +80,7 @@ function isNode(): boolean {
  */
 async function loadBrowserWasm(): Promise<WasmModule> {
   // Dynamic import of the generated WASM bindings
+  // Path is ../../pkg from js/src, transformed to ../pkg during build for dist/
   const wasm = await import('../../pkg/anki_renderer.js');
   await wasm.default();
   return wasm as unknown as WasmModule;
@@ -90,6 +91,7 @@ async function loadBrowserWasm(): Promise<WasmModule> {
  */
 async function loadNodeWasm(): Promise<WasmModule> {
   // In Node.js, use the nodejs target build
+  // Path is ../../pkg-node from js/src, transformed to ../pkg-node during build for dist/
   const wasm = await import('../../pkg-node/anki_renderer.js');
   return wasm as unknown as WasmModule;
 }
