@@ -254,3 +254,41 @@ Proto dependencies can be avoided entirely. The proto types are used for the gRP
 **Testing notes:**
 - 54 Rust tests + 19 Jest tests + 9 Playwright e2e tests all pass
 - CI passes
+
+---
+
+## Agent Session - Issue #8
+
+**Worked on:** Issue #8 - CSS Styling Support
+
+**What I did:**
+- Created `js/src/styles.ts` with CSS utility functions
+- Defined `DEFAULT_ANKI_CSS` constant with Anki's standard card styles
+- Defined `NIGHT_MODE_CSS` for dark theme support
+- Implemented `buildCss()` to combine style options
+- Implemented `wrapWithStyles()` to wrap content in styled containers
+- Implemented `createStyledCard()` convenience function
+- Added `StyleOptions` and `StyledRenderResult` types to `types.ts`
+- Added `renderStyledCard()` function to `index.ts` for complete styled rendering
+- Updated web component with CSS support:
+  - Added `css`, `night-mode`, `default-styles` attributes
+  - Added `customStyleElement` for dynamic CSS injection
+  - Added `.card` class to content container for CSS targeting
+  - Added `nightMode` class when dark theme enabled
+- Added 16 new tests for CSS styling in `index.test.ts`
+- All acceptance criteria met: CSS applied, default styles available, night mode works, styles scoped
+
+**What I learned:**
+- Anki uses `.card` as the root CSS selector
+- Night mode uses `#2f2f31` background (dark gray, not pure black)
+- CSS can be dynamically injected into Shadow DOM via style element
+- Circular imports between component.ts and index.ts needed careful management
+
+**Codebase facts discovered:**
+- Shadow DOM style injection works via `style.textContent = css`
+- Boolean attributes on custom elements checked via `hasAttribute()`
+- Styling options can be combined: defaults + night mode + custom CSS
+
+**Testing notes:**
+- 54 Rust tests + 40 Jest tests + 9 Playwright e2e tests all pass
+- CI passes
