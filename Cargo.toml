@@ -1,0 +1,20 @@
+[package]
+name = "anki-renderer"
+version = "0.1.0"
+edition = "2021"
+description = "Anki card template renderer compiled to WebAssembly"
+license = "MIT"
+repository = "https://github.com/Gilbetrar/anki-renderer"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[profile.release]
+opt-level = "s"
+lto = true

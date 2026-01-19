@@ -1,0 +1,38 @@
+{
+  "name": "anki-renderer",
+  "version": "0.1.0",
+  "description": "Anki card template renderer compiled to WebAssembly",
+  "main": "pkg/anki_renderer.js",
+  "types": "pkg/anki_renderer.d.ts",
+  "files": [
+    "pkg/"
+  ],
+  "scripts": {
+    "build": "wasm-pack build --target web --out-dir pkg",
+    "build:node": "wasm-pack build --target nodejs --out-dir pkg-node",
+    "test": "cargo test",
+    "test:wasm": "wasm-pack test --headless --chrome",
+    "typecheck": "echo 'No TypeScript to check yet'",
+    "lint": "cargo clippy -- -D warnings",
+    "clean": "cargo clean && rm -rf pkg pkg-node"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Gilbetrar/anki-renderer.git"
+  },
+  "keywords": [
+    "anki",
+    "flashcards",
+    "wasm",
+    "webassembly",
+    "template",
+    "renderer"
+  ],
+  "author": "Ben Bateman",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Gilbetrar/anki-renderer/issues"
+  },
+  "homepage": "https://github.com/Gilbetrar/anki-renderer#readme",
+  "devDependencies": {}
+}
