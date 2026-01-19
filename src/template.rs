@@ -1,3 +1,4 @@
+use crate::cloze;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_until, take_while1},
@@ -135,7 +136,11 @@ pub fn parse_template(template: &str) -> Result<Vec<TemplateNode>, String> {
 }
 
 /// Render parsed template nodes with given fields
-pub fn render_nodes(nodes: &[TemplateNode], fields: &HashMap<String, String>) -> String {
+pub fn render_nodes(
+    nodes: &[TemplateNode],
+    fields: &HashMap<String, String>,
+    cloze_ctx: Option<&ClozeContext>,
+) -> String {
     let mut output = String::new();
 
     for node in nodes {
@@ -143,16 +148,24 @@ pub fn render_nodes(nodes: &[TemplateNode], fields: &HashMap<String, String>) ->
             TemplateNode::Text(text) => {
                 output.push_str(text);
             }
-            TemplateNode::Field { name, filters: _ } => {
+            TemplateNode::Field { name, filters } => {
                 // Handle special fields
-                let value = match name.as_str() {
+                let mut value = match name.as_str() {
                     "FrontSide" => fields.get("FrontSide").cloned().unwrap_or_default(),
                     "Tags" => fields.get("Tags").cloned().unwrap_or_default(),
                     "Deck" => fields.get("Deck").cloned().unwrap_or_default(),
                     "Card" => fields.get("Card").cloned().unwrap_or_default(),
                     _ => fields.get(name).cloned().unwrap_or_default(),
                 };
-                // TODO: Apply filters in issue #5
+
+                // Apply cloze filter if present
+                if filters.iter().any(|f| f == "cloze") {
+                    if let Some(ctx) = cloze_ctx {
+                        value = cloze::render_cloze(&value, ctx.card_ord, ctx.is_question);
+                    }
+                }
+                // TODO: Apply other filters in issue #5
+
                 output.push_str(&value);
             }
             TemplateNode::Conditional {
@@ -170,7 +183,7 @@ pub fn render_nodes(nodes: &[TemplateNode], fields: &HashMap<String, String>) ->
                 };
 
                 if should_render {
-                    output.push_str(&render_nodes(children, fields));
+                    output.push_str(&render_nodes(children, fields, cloze_ctx));
                 }
             }
         }
@@ -182,7 +195,28 @@ pub fn render_nodes(nodes: &[TemplateNode], fields: &HashMap<String, String>) ->
 /// Render a template string with the given fields
 pub fn render(template: &str, fields: &HashMap<String, String>) -> Result<String, String> {
     let nodes = parse_template(template)?;
-    Ok(render_nodes(&nodes, fields))
+    Ok(render_nodes(&nodes, fields, None))
+}
+
+/// Cloze rendering context
+pub struct ClozeContext {
+    pub card_ord: u32,
+    pub is_question: bool,
+}
+
+/// Render a template string with cloze support
+pub fn render_with_cloze(
+    template: &str,
+    fields: &HashMap<String, String>,
+    card_ord: u32,
+    is_question: bool,
+) -> Result<String, String> {
+    let nodes = parse_template(template)?;
+    let ctx = ClozeContext {
+        card_ord,
+        is_question,
+    };
+    Ok(render_nodes(&nodes, fields, Some(&ctx)))
 }
 
 #[cfg(test)]
