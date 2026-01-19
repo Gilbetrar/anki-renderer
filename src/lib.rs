@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 
 mod cloze;
+mod filters;
 mod template;
 
 /// Render an Anki card template with the given fields.

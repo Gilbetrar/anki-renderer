@@ -1,4 +1,5 @@
 use crate::cloze;
+use crate::filters;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_until, take_while1},
@@ -37,7 +38,7 @@ fn field_name(input: &str) -> IResult<&str, &str> {
 fn filter_chain(input: &str) -> IResult<&str, (Vec<&str>, &str)> {
     let (input, parts) = recognize(pair(
         many0(pair(
-            take_while1(|c: char| c.is_alphanumeric() || c == '-'),
+            take_while1(|c: char| c.is_alphanumeric() || c == '-' || c == '_'),
             char(':'),
         )),
         field_name,
@@ -158,13 +159,18 @@ pub fn render_nodes(
                     _ => fields.get(name).cloned().unwrap_or_default(),
                 };
 
-                // Apply cloze filter if present
-                if filters.iter().any(|f| f == "cloze") {
-                    if let Some(ctx) = cloze_ctx {
-                        value = cloze::render_cloze(&value, ctx.card_ord, ctx.is_question);
+                // Apply filters in reverse order (right-to-left, innermost first)
+                // {{text:hint:Field}} means: apply hint first, then text
+                for filter in filters.iter().rev() {
+                    if filter == "cloze" {
+                        // Cloze filter needs special context handling
+                        if let Some(ctx) = cloze_ctx {
+                            value = cloze::render_cloze(&value, ctx.card_ord, ctx.is_question);
+                        }
+                    } else {
+                        value = filters::apply_filter(filter, &value);
                     }
                 }
-                // TODO: Apply other filters in issue #5
 
                 output.push_str(&value);
             }
@@ -326,5 +332,112 @@ mod tests {
         assert_eq!(render("{{Tags}}", &fields).unwrap(), "tag1 tag2");
         assert_eq!(render("{{Deck}}", &fields).unwrap(), "MyDeck");
         assert_eq!(render("{{Card}}", &fields).unwrap(), "Card 1");
+    }
+
+    // Filter integration tests
+    #[test]
+    fn test_text_filter_via_template() {
+        let mut fields = HashMap::new();
+        fields.insert("Field".to_string(), "<b>Bold</b> text".to_string());
+
+        let result = render("{{text:Field}}", &fields).unwrap();
+        assert_eq!(result, "Bold text");
+    }
+
+    #[test]
+    fn test_hint_filter_via_template() {
+        let mut fields = HashMap::new();
+        fields.insert("Definition".to_string(), "The answer".to_string());
+
+        let result = render("{{hint:Definition}}", &fields).unwrap();
+        assert!(result.contains("Show Hint"));
+        assert!(result.contains("The answer"));
+    }
+
+    #[test]
+    fn test_type_filter_via_template() {
+        let mut fields = HashMap::new();
+        fields.insert("Answer".to_string(), "correct".to_string());
+
+        let result = render("{{type:Answer}}", &fields).unwrap();
+        assert!(result.contains("<input"));
+        assert!(result.contains("data-expected=\"correct\""));
+    }
+
+    #[test]
+    fn test_furigana_filter_via_template() {
+        let mut fields = HashMap::new();
+        fields.insert("Japanese".to_string(), "日本語[にほんご]".to_string());
+
+        let result = render("{{furigana:Japanese}}", &fields).unwrap();
+        assert!(result.contains("<ruby>日本語<rt>にほんご</rt></ruby>"));
+    }
+
+    #[test]
+    fn test_kanji_filter_via_template() {
+        let mut fields = HashMap::new();
+        fields.insert("Japanese".to_string(), "日本語[にほんご]".to_string());
+
+        let result = render("{{kanji:Japanese}}", &fields).unwrap();
+        assert_eq!(result, "日本語");
+    }
+
+    #[test]
+    fn test_kana_filter_via_template() {
+        let mut fields = HashMap::new();
+        fields.insert("Japanese".to_string(), "日本語[にほんご]".to_string());
+
+        let result = render("{{kana:Japanese}}", &fields).unwrap();
+        assert_eq!(result, "にほんご");
+    }
+
+    #[test]
+    fn test_chained_filters() {
+        let mut fields = HashMap::new();
+        fields.insert("Field".to_string(), "<b>Hidden</b>".to_string());
+
+        // {{text:hint:Field}} means: apply hint first, then text
+        // But this doesn't make semantic sense - hint generates HTML, then text strips it
+        // A more sensible chain would be hint:text (strip HTML first, then wrap in hint)
+        // However, Anki applies right-to-left, so let's test that
+        let result = render("{{text:hint:Field}}", &fields).unwrap();
+        // hint generates HTML with "Show Hint" etc, then text strips tags
+        assert!(result.contains("Show Hint"));
+        assert!(!result.contains("<a")); // text filter stripped the anchor tag
+    }
+
+    #[test]
+    fn test_chained_filters_practical() {
+        // More practical: text first (innermost), then hint
+        let mut fields = HashMap::new();
+        fields.insert("Field".to_string(), "<b>Bold hint</b>".to_string());
+
+        // {{hint:text:Field}} applies text first (strips HTML), then hint (wraps result)
+        let result = render("{{hint:text:Field}}", &fields).unwrap();
+        assert!(result.contains("Show Hint"));
+        assert!(result.contains("Bold hint")); // HTML stripped, text preserved
+        assert!(!result.contains("<b>")); // Original bold tag stripped
+    }
+
+    #[test]
+    fn test_unknown_filter_passes_through() {
+        let mut fields = HashMap::new();
+        fields.insert("Field".to_string(), "content".to_string());
+
+        let result = render("{{unknown_filter:Field}}", &fields).unwrap();
+        assert_eq!(result, "content");
+    }
+
+    #[test]
+    fn test_multiple_filters_parsing() {
+        let nodes = parse_template("{{text:hint:Field}}").unwrap();
+        assert_eq!(nodes.len(), 1);
+        match &nodes[0] {
+            TemplateNode::Field { name, filters } => {
+                assert_eq!(name, "Field");
+                assert_eq!(filters, &vec!["text".to_string(), "hint".to_string()]);
+            }
+            _ => panic!("Expected Field node"),
+        }
     }
 }
