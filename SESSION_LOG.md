@@ -153,3 +153,37 @@ Proto dependencies can be avoided entirely. The proto types are used for the gRP
 
 **Testing notes:**
 - All 54 tests pass (20 filter + 28 template + 8 cloze + 4 integration)
+
+---
+
+## Agent Session - Issue #6
+
+**Worked on:** Issue #6 - JavaScript/TypeScript Bindings
+
+**What I did:**
+- Created `js/src/types.ts` with TypeScript type definitions (NoteFields, CardTemplate, RenderOptions, RenderResult, RenderError)
+- Created `js/src/index.ts` with high-level ergonomic API
+- Implemented `renderCard()` function that renders both front and back, handling FrontSide replacement
+- Implemented async WASM loading with environment detection (browser vs Node.js)
+- Added utility functions: `initWasm()`, `isInitialized()`, `getVersion()`, `countClozeCards()`, `renderTemplate()`
+- Created `js/tsconfig.json` for TypeScript compilation
+- Created `jest.config.js` with ts-jest for ESM testing
+- Created 19 comprehensive tests in `js/tests/index.test.ts`
+- Updated package.json with TypeScript dependencies and build scripts
+- Added `/dist/` to .gitignore for generated JavaScript output
+
+**What I learned:**
+- FrontSide must be added to fields BEFORE rendering, not replaced after
+- The FrontSide field contains the rendered question HTML
+- wasm-pack generates different output for `--target web` (needs init) vs `--target nodejs` (synchronous)
+- ts-jest with ESM requires `useESM: true` and `extensionsToTreatAsEsm`
+- Multiple wasm-pack outputs with same name cause Jest haste collision warnings (harmless)
+
+**Codebase facts discovered:**
+- WASM web target exports a default function to initialize the module
+- Node.js WASM target loads synchronously, no init needed
+- TypeScript types should use `Record<string, string>` for field maps
+
+**Testing notes:**
+- 54 Rust tests + 19 JavaScript tests all pass
+- CI workflow passes

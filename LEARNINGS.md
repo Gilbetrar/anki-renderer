@@ -122,3 +122,26 @@ Proto types are used for RPC service layer, not core rendering:
 - Image occlusion (complex, niche use case)
 - TTS voice enumeration (platform-specific)
 - LaTeX extraction (separate concern)
+
+## JavaScript/TypeScript Bindings
+
+Structure:
+- `js/src/index.ts` - Main wrapper with high-level API
+- `js/src/types.ts` - TypeScript type definitions
+- `js/tests/` - Jest tests
+- `dist/` - Compiled JavaScript output (gitignored)
+
+Key patterns:
+- FrontSide must be added to fields BEFORE rendering the back template
+- WASM web target requires calling `init()`, Node.js target doesn't
+- Use environment detection to load correct WASM build
+- Export both low-level (`renderTemplate`) and high-level (`renderCard`) APIs
+
+Build commands:
+```bash
+npm run build:wasm       # Web target → pkg/
+npm run build:wasm:node  # Node target → pkg-node/
+npm run build:ts         # TypeScript → dist/
+npm run build            # All three
+npm run test:js          # Jest tests
+```
