@@ -407,3 +407,31 @@ Proto dependencies can be avoided entirely. The proto types are used for the gRP
 **Mistakes made:** None
 
 **CI Status:** Awaiting verification
+
+---
+
+## Agent Session - Issue #12
+
+**Worked on:** Issue #12 - Replace Simple Hash with blake3 for Hint IDs
+
+**What I did:**
+- Added `blake3 = "1"` dependency to Cargo.toml
+- Replaced `simple_hash()` function with `blake3_hash_id()` in `src/filters.rs`
+- New implementation uses blake3 hash truncated to u64 (first 8 bytes)
+- Maintains same ID format (`hint{hash}`) for backwards compatibility
+- All tests pass (54 Rust tests + TS tests)
+- CI passed successfully
+
+**What I learned:**
+- blake3 provides `hash.as_bytes()` to get the 32-byte output
+- Can convert first 8 bytes to u64 using `u64::from_le_bytes()`
+- The blake3 crate adds several transitive dependencies (arrayref, arrayvec, constant_time_eq, cpufeatures, libc)
+
+**Codebase facts discovered:**
+- Hint filter generates HTML with unique IDs for onclick handling
+- The hash format is used in: `hint{hash}` for element IDs
+- Simple hash collision was a theoretical risk, now eliminated
+
+**Mistakes made:** None
+
+**CI Status:** Success
