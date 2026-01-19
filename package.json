@@ -35,7 +35,10 @@
     "test:e2e": "npx playwright test",
     "typecheck": "tsc -p js/tsconfig.json --noEmit",
     "lint": "cargo clippy -- -D warnings",
-    "clean": "cargo clean && rm -rf pkg pkg-node dist"
+    "clean": "cargo clean && rm -rf pkg pkg-node dist",
+    "demo:install": "cd demo && npm install",
+    "demo:dev": "cd demo && npm run dev",
+    "demo:build": "cd demo && npm run build"
   },
   "repository": {
     "type": "git",

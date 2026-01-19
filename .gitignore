@@ -13,6 +13,9 @@ node_modules/
 # TypeScript build output
 /dist/
 
+# Demo build output
+/demo/dist/
+
 # IDE
 .idea/
 .vscode/
@@ -26,3 +29,4 @@ node_modules/
 # OS
 .DS_Store
 Thumbs.db
+SIGNAL.txt

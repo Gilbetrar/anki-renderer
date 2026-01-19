@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>anki-renderer Demo</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <header>
+    <h1>anki-renderer</h1>
+    <p class="tagline">Anki card template renderer compiled to WebAssembly</p>
+    <nav>
+      <a href="#demo">Demo</a>
+      <a href="#examples">Examples</a>
+      <a href="#api">API</a>
+      <a href="https://github.com/Gilbetrar/anki-renderer" target="_blank">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <section id="demo" class="section">
+      <h2>Live Demo</h2>
+      <p>Edit the templates and fields below to see the rendered card in real-time.</p>
+
+      <div class="demo-grid">
+        <div class="editor-panel">
+          <div class="editor-group">
+            <label for="template-front">Front Template</label>
+            <textarea id="template-front" rows="3">{{Front}}</textarea>
+          </div>
+
+          <div class="editor-group">
+            <label for="template-back">Back Template</label>
+            <textarea id="template-back" rows="3">{{FrontSide}}<hr>{{Back}}</textarea>
+          </div>
+
+          <div class="editor-group">
+            <label for="fields-json">Fields (JSON)</label>
+            <textarea id="fields-json" rows="4">{"Front": "What is 2 + 2?", "Back": "4"}</textarea>
+          </div>
+
+          <div class="options-row">
+            <div class="editor-group">
+              <label for="card-ordinal">Cloze Card # (0 for non-cloze)</label>
+              <input type="number" id="card-ordinal" value="0" min="0">
+            </div>
+            <div class="checkbox-group">
+              <label>
+                <input type="checkbox" id="night-mode"> Night Mode
+              </label>
+              <label>
+                <input type="checkbox" id="default-styles" checked> Default Styles
+              </label>
+            </div>
+          </div>
+
+          <div class="editor-group">
+            <label for="custom-css">Custom CSS (optional)</label>
+            <textarea id="custom-css" rows="3" placeholder=".card { font-size: 24px; }"></textarea>
+          </div>
+        </div>
+
+        <div class="preview-panel">
+          <div class="preview-header">
+            <h3>Preview</h3>
+            <div class="side-toggle">
+              <button id="show-question" class="active">Question</button>
+              <button id="show-answer">Answer</button>
+            </div>
+          </div>
+          <div id="preview-container" class="preview-container">
+            <div id="card-preview"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="examples" class="section">
+      <h2>Examples</h2>
+
+      <div class="example-grid">
+        <div class="example-card" data-example="basic">
+          <h3>Basic Card</h3>
+          <p>Simple question and answer with field substitution.</p>
+          <button class="try-btn">Try it</button>
+        </div>
+
+        <div class="example-card" data-example="cloze">
+          <h3>Cloze Deletion</h3>
+          <p>Fill-in-the-blank style cards with hidden text.</p>
+          <button class="try-btn">Try it</button>
+        </div>
+
+        <div class="example-card" data-example="hint">
+          <h3>Hints</h3>
+          <p>Clickable hint reveals hidden content.</p>
+          <button class="try-btn">Try it</button>
+        </div>
+
+        <div class="example-card" data-example="furigana">
+          <h3>Furigana (Japanese)</h3>
+          <p>Ruby annotations for Japanese readings.</p>
+          <button class="try-btn">Try it</button>
+        </div>
+
+        <div class="example-card" data-example="styled">
+          <h3>Custom Styling</h3>
+          <p>Cards with custom CSS styling.</p>
+          <button class="try-btn">Try it</button>
+        </div>
+
+        <div class="example-card" data-example="filters">
+          <h3>Filters</h3>
+          <p>Text processing with filters like text: and type:.</p>
+          <button class="try-btn">Try it</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="api" class="section">
+      <h2>API Reference</h2>
+
+      <div class="api-section">
+        <h3>Installation</h3>
+        <pre><code>npm install anki-renderer</code></pre>
+      </div>
+
+      <div class="api-section">
+        <h3>Basic Usage</h3>
+        <pre><code>import { renderCard, initWasm } from 'anki-renderer';
+
+// Initialize WASM (optional - auto-initializes on first render)
+await initWasm();
+
+// Render a card
+const result = await renderCard({
+  front: "{{Front}}",
+  back: "{{FrontSide}}&lt;hr&gt;{{Back}}",
+  fields: { Front: "Question", Back: "Answer" },
+});
+
+console.log(result.question); // "Question"
+console.log(result.answer);   // "Question&lt;hr&gt;Answer"</code></pre>
+      </div>
+
+      <div class="api-section">
+        <h3>Cloze Deletions</h3>
+        <pre><code>const result = await renderCard({
+  front: "{{cloze:Text}}",
+  back: "{{cloze:Text}}",
+  fields: { Text: "{{c1::Paris}} is the capital of {{c2::France}}" },
+  cardOrdinal: 1,
+});
+
+// Card 1: "[...]" is visible, "France" is visible
+// Card 2: "Paris" is visible, "[...]" is visible</code></pre>
+      </div>
+
+      <div class="api-section">
+        <h3>Styled Cards</h3>
+        <pre><code>import { renderStyledCard, DEFAULT_ANKI_CSS } from 'anki-renderer';
+
+const result = await renderStyledCard({
+  front: "{{Front}}",
+  back: "{{Back}}",
+  fields: { Front: "Question", Back: "Answer" },
+  style: {
+    css: ".card { background: navy; color: white; }",
+    includeDefaultStyles: true,
+    nightMode: false,
+  },
+});
+
+// result.styledQuestion includes &lt;style&gt; tag and .card wrapper</code></pre>
+      </div>
+
+      <div class="api-section">
+        <h3>Web Component</h3>
+        <pre><code>&lt;script type="module"&gt;
+  import 'anki-renderer/component';
+&lt;/script&gt;
+
+&lt;anki-card-preview
+  template-front="{{Word}}"
+  template-back="{{Word}}&lt;br&gt;{{Definition}}"
+  fields='{"Word": "hello", "Definition": "greeting"}'
+  side="question"
+  default-styles
+  night-mode&gt;
+&lt;/anki-card-preview&gt;</code></pre>
+      </div>
+
+      <div class="api-section">
+        <h3>Available Filters</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Filter</th>
+              <th>Description</th>
+              <th>Example</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>text</code></td>
+              <td>Strip HTML tags</td>
+              <td><code>{{text:Field}}</code></td>
+            </tr>
+            <tr>
+              <td><code>hint</code></td>
+              <td>Clickable reveal</td>
+              <td><code>{{hint:Extra}}</code></td>
+            </tr>
+            <tr>
+              <td><code>type</code></td>
+              <td>Answer input field</td>
+              <td><code>{{type:Answer}}</code></td>
+            </tr>
+            <tr>
+              <td><code>furigana</code></td>
+              <td>Ruby annotations</td>
+              <td><code>{{furigana:Reading}}</code></td>
+            </tr>
+            <tr>
+              <td><code>kanji</code></td>
+              <td>Extract base text</td>
+              <td><code>{{kanji:Reading}}</code></td>
+            </tr>
+            <tr>
+              <td><code>kana</code></td>
+              <td>Extract readings</td>
+              <td><code>{{kana:Reading}}</code></td>
+            </tr>
+            <tr>
+              <td><code>cloze</code></td>
+              <td>Cloze deletions</td>
+              <td><code>{{cloze:Text}}</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Built with WASM for fast, client-side Anki card rendering.</p>
+    <p><a href="https://github.com/Gilbetrar/anki-renderer">View on GitHub</a></p>
+  </footer>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
