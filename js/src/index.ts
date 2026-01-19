@@ -21,7 +21,6 @@
 
 export type {
   NoteFields,
-  CardTemplate,
   RenderOptions,
   RenderResult,
   StyleOptions,

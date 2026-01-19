@@ -8,16 +8,6 @@
 export type NoteFields = Record<string, string>;
 
 /**
- * Card template with front and back templates.
- */
-export interface CardTemplate {
-  /** Template for the question side (front) */
-  front: string;
-  /** Template for the answer side (back) */
-  back: string;
-}
-
-/**
  * Options for styling the rendered card.
  */
 export interface StyleOptions {
