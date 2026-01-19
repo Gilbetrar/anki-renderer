@@ -40,3 +40,61 @@ cd pkg && npm pack
 
 - The action is `dtolnay/rust-toolchain` not `rust-action`
 - wasm-pack installer script requires rustup to be visible in PATH
+
+## rslib Dependency Analysis (Issue #2)
+
+### Core Files for Template Rendering
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `template.rs` | ~1400 | Main template parser and renderer |
+| `template_filters.rs` | ~300 | Filter implementations (text, furigana, hint, tts, cloze) |
+| `cloze.rs` | ~850 | Cloze deletion parsing and rendering |
+
+### External Crates (Required)
+
+- `nom` - Parser combinator (template syntax parsing)
+- `regex` - Pattern matching (cloze, HTML, furigana)
+- `htmlescape` - HTML attribute encoding
+- `blake3` + `hex` - Hash generation for hint IDs
+- `itertools` - Iterator utilities (cloze ordinals)
+
+### Internal Dependencies (Need Stubs)
+
+| Module | Usage | Stub Strategy |
+|--------|-------|---------------|
+| `anki_i18n::I18n` | Error messages, blank indicators | Simple string fallbacks |
+| `crate::error` | `AnkiError`, `TemplateError` | Minimal custom error enum |
+| `crate::text` | `strip_html`, `strip_html_preserving_entities` | Reimplement (~100 lines) |
+| `crate::latex` | `contains_latex` | Simple regex check |
+| `crate::image_occlusion` | Image cloze parsing | Defer to phase 2 |
+
+### Proto Dependencies (Can Avoid)
+
+Proto types are used for RPC service layer, not core rendering:
+- `anki_proto::card_rendering` - Only needed for service boundary
+- `anki_proto::image_occlusion` - Only for image occlusion feature
+
+**Recommendation**: Avoid proto entirely. Define native Rust types for WASM interface.
+
+### Minimal WASM Extraction Plan
+
+**Phase 1 - Core Template Parsing**:
+1. Port `template.rs` parser (lexer, AST, parser)
+2. Port `template.rs` renderer (field substitution, conditionals)
+3. Implement basic error types
+
+**Phase 2 - Filters**:
+1. Port `template_filters.rs` (text, furigana, kana, kanji, hint, type, tts)
+2. Port `cloze.rs` cloze filter
+3. Stub I18n with default strings
+
+**Phase 3 - Full Cloze Support**:
+1. Full `cloze.rs` implementation
+2. Nested cloze support
+3. Multi-card cloze support
+
+**Deferred**:
+- Image occlusion (complex, niche use case)
+- TTS voice enumeration (platform-specific)
+- LaTeX extraction (separate concern)
