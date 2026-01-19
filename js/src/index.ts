@@ -19,14 +19,34 @@
  * ```
  */
 
-export type { NoteFields, CardTemplate, RenderOptions, RenderResult } from './types.js';
+export type {
+  NoteFields,
+  CardTemplate,
+  RenderOptions,
+  RenderResult,
+  StyleOptions,
+  StyledRenderResult,
+} from './types.js';
 export { RenderError } from './types.js';
+
+// Export styling utilities
+export {
+  DEFAULT_ANKI_CSS,
+  NIGHT_MODE_CSS,
+  buildCss,
+  wrapWithStyles,
+  createStyledCard,
+} from './styles.js';
 
 // Note: Web Component (AnkiCardPreview) is exported separately from 'anki-renderer/component'
 // to avoid loading DOM APIs in Node.js environments
 
-import type { RenderOptions, RenderResult } from './types.js';
+import type { RenderOptions, RenderResult, StyleOptions } from './types.js';
 import { RenderError } from './types.js';
+import { buildCss, wrapWithStyles } from './styles.js';
+
+// Used for StyledRenderResult return type
+import type { StyledRenderResult } from './types.js';
 
 // WASM module interface
 interface WasmModule {
@@ -203,6 +223,58 @@ export async function renderCard(options: RenderOptions): Promise<RenderResult> 
       error instanceof Error ? error.message : String(error)
     );
   }
+}
+
+/**
+ * Options for rendering a styled card.
+ */
+export interface StyledRenderOptions extends RenderOptions {
+  /** Style options for the rendered card */
+  style?: StyleOptions;
+}
+
+/**
+ * Render a card with CSS styling applied.
+ *
+ * This function renders both template sides and wraps them
+ * with the specified CSS styles in a .card container.
+ *
+ * @param options - Rendering and style options
+ * @returns Rendered HTML with raw and styled versions
+ * @throws RenderError if rendering fails
+ *
+ * @example
+ * ```typescript
+ * const result = await renderStyledCard({
+ *   front: "{{Front}}",
+ *   back: "{{FrontSide}}<hr>{{Back}}",
+ *   fields: { Front: "Question", Back: "Answer" },
+ *   style: {
+ *     css: ".card { background: navy; color: white; }",
+ *     includeDefaultStyles: true,
+ *     nightMode: false,
+ *   },
+ * });
+ *
+ * console.log(result.styledQuestion); // Complete HTML with styles
+ * ```
+ */
+export async function renderStyledCard(
+  options: StyledRenderOptions
+): Promise<StyledRenderResult> {
+  // First render the raw content
+  const { question, answer } = await renderCard(options);
+
+  // Build CSS and wrap with styles
+  const styleOpts = options.style || {};
+  const css = buildCss(styleOpts);
+
+  return {
+    question,
+    answer,
+    styledQuestion: wrapWithStyles(question, css, styleOpts.nightMode),
+    styledAnswer: wrapWithStyles(answer, css, styleOpts.nightMode),
+  };
 }
 
 /**

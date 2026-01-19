@@ -38,6 +38,9 @@ describe('AnkiCardPreview', () => {
         'fields',
         'side',
         'card-ordinal',
+        'css',
+        'night-mode',
+        'default-styles',
       ]);
     });
   });

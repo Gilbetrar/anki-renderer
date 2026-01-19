@@ -14,7 +14,7 @@
  * ```
  */
 
-import { renderCard, initWasm } from './index.js';
+import { renderCard, initWasm, DEFAULT_ANKI_CSS, NIGHT_MODE_CSS } from './index.js';
 import type { NoteFields } from './types.js';
 
 /**
@@ -46,6 +46,9 @@ export interface RenderErrorDetail {
  * - `fields`: JSON object of field name/value pairs
  * - `side`: Which side to display ("question" or "answer")
  * - `card-ordinal`: Card ordinal for cloze cards (1-indexed, optional)
+ * - `css`: Custom CSS to apply to the card
+ * - `night-mode`: Enable night mode (dark theme) - boolean attribute
+ * - `default-styles`: Include Anki's default styles - boolean attribute
  *
  * Events:
  * - `render-complete`: Fired when rendering succeeds
@@ -53,11 +56,13 @@ export interface RenderErrorDetail {
  */
 export class AnkiCardPreview extends HTMLElement {
   private shadow: ShadowRoot;
+  private baseStyleElement: HTMLStyleElement;
+  private customStyleElement: HTMLStyleElement;
   private contentContainer: HTMLDivElement;
   private initialized = false;
 
   static get observedAttributes(): string[] {
-    return ['template-front', 'template-back', 'fields', 'side', 'card-ordinal'];
+    return ['template-front', 'template-back', 'fields', 'side', 'card-ordinal', 'css', 'night-mode', 'default-styles'];
   }
 
   constructor() {
@@ -66,9 +71,9 @@ export class AnkiCardPreview extends HTMLElement {
     // Create shadow DOM
     this.shadow = this.attachShadow({ mode: 'open' });
 
-    // Add base styles
-    const style = document.createElement('style');
-    style.textContent = `
+    // Add base styles (component infrastructure)
+    this.baseStyleElement = document.createElement('style');
+    this.baseStyleElement.textContent = `
       :host {
         display: block;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -88,7 +93,7 @@ export class AnkiCardPreview extends HTMLElement {
         color: #6c757d;
         font-style: italic;
       }
-      /* Anki default styles */
+      /* Fallback styles if no custom CSS is provided */
       .cloze {
         font-weight: bold;
         color: #0000ff;
@@ -101,12 +106,16 @@ export class AnkiCardPreview extends HTMLElement {
       }
     `;
 
-    // Create content container
+    // Custom style element for user CSS, default styles, night mode
+    this.customStyleElement = document.createElement('style');
+
+    // Create content container (with .card class for CSS targeting)
     this.contentContainer = document.createElement('div');
-    this.contentContainer.className = 'content loading';
+    this.contentContainer.className = 'content card loading';
     this.contentContainer.textContent = 'Loading...';
 
-    this.shadow.appendChild(style);
+    this.shadow.appendChild(this.baseStyleElement);
+    this.shadow.appendChild(this.customStyleElement);
     this.shadow.appendChild(this.contentContainer);
   }
 
@@ -194,6 +203,68 @@ export class AnkiCardPreview extends HTMLElement {
   }
 
   /**
+   * Get custom CSS for the card
+   */
+  get css(): string {
+    return this.getAttribute('css') || '';
+  }
+
+  set css(value: string) {
+    this.setAttribute('css', value);
+  }
+
+  /**
+   * Get whether night mode is enabled
+   */
+  get nightMode(): boolean {
+    return this.hasAttribute('night-mode');
+  }
+
+  set nightMode(value: boolean) {
+    if (value) {
+      this.setAttribute('night-mode', '');
+    } else {
+      this.removeAttribute('night-mode');
+    }
+  }
+
+  /**
+   * Get whether default Anki styles should be included
+   */
+  get defaultStyles(): boolean {
+    return this.hasAttribute('default-styles');
+  }
+
+  set defaultStyles(value: boolean) {
+    if (value) {
+      this.setAttribute('default-styles', '');
+    } else {
+      this.removeAttribute('default-styles');
+    }
+  }
+
+  /**
+   * Build the combined CSS for the card
+   */
+  private buildCardCss(): string {
+    const parts: string[] = [];
+
+    if (this.defaultStyles) {
+      parts.push(DEFAULT_ANKI_CSS);
+    }
+
+    if (this.nightMode) {
+      parts.push(NIGHT_MODE_CSS);
+    }
+
+    if (this.css) {
+      parts.push(this.css);
+    }
+
+    return parts.join('\n');
+  }
+
+  /**
    * Programmatically trigger a re-render
    */
   async render(): Promise<void> {
@@ -208,8 +279,11 @@ export class AnkiCardPreview extends HTMLElement {
     const side = this.side;
     const cardOrdinal = this.cardOrdinal;
 
+    // Update custom CSS
+    this.customStyleElement.textContent = this.buildCardCss();
+
     // Show loading state
-    this.contentContainer.className = 'content loading';
+    this.contentContainer.className = 'content card loading';
     this.contentContainer.textContent = 'Loading...';
 
     try {
@@ -226,7 +300,13 @@ export class AnkiCardPreview extends HTMLElement {
 
       // Display the requested side
       const content = side === 'answer' ? result.answer : result.question;
-      this.contentContainer.className = 'content';
+
+      // Set classes including nightMode if enabled
+      const classes = ['content', 'card'];
+      if (this.nightMode) {
+        classes.push('nightMode');
+      }
+      this.contentContainer.className = classes.join(' ');
       this.contentContainer.innerHTML = content;
 
       // Dispatch success event
@@ -240,7 +320,7 @@ export class AnkiCardPreview extends HTMLElement {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
 
-      this.contentContainer.className = 'content error';
+      this.contentContainer.className = 'content card error';
       this.contentContainer.textContent = `Render error: ${message}`;
 
       // Dispatch error event

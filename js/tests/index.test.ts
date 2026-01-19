@@ -5,11 +5,17 @@
 import {
   renderCard,
   renderTemplate,
+  renderStyledCard,
   countClozeCards,
   getVersion,
   initWasm,
   isInitialized,
   RenderError,
+  DEFAULT_ANKI_CSS,
+  NIGHT_MODE_CSS,
+  buildCss,
+  wrapWithStyles,
+  createStyledCard,
 } from '../src/index.js';
 
 describe('anki-renderer', () => {
@@ -198,6 +204,159 @@ describe('anki-renderer', () => {
       // Hint filter creates a clickable "Show Hint" element
       expect(result.question).toContain('Show Hint');
       expect(result.question).toContain('Hidden content');
+    });
+  });
+
+  describe('CSS styling', () => {
+    describe('style constants', () => {
+      it('should export DEFAULT_ANKI_CSS', () => {
+        expect(DEFAULT_ANKI_CSS).toBeDefined();
+        expect(DEFAULT_ANKI_CSS).toContain('.card');
+        expect(DEFAULT_ANKI_CSS).toContain('.cloze');
+      });
+
+      it('should export NIGHT_MODE_CSS', () => {
+        expect(NIGHT_MODE_CSS).toBeDefined();
+        expect(NIGHT_MODE_CSS).toContain('nightMode');
+        expect(NIGHT_MODE_CSS).toContain('background-color');
+      });
+    });
+
+    describe('buildCss', () => {
+      it('should return empty string with no options', () => {
+        const css = buildCss({});
+        expect(css).toBe('');
+      });
+
+      it('should include default styles when requested', () => {
+        const css = buildCss({ includeDefaultStyles: true });
+        expect(css).toContain('.card');
+        expect(css).toContain('.cloze');
+      });
+
+      it('should include night mode styles when requested', () => {
+        const css = buildCss({ nightMode: true });
+        expect(css).toContain('nightMode');
+      });
+
+      it('should include custom CSS', () => {
+        const css = buildCss({ css: '.custom { color: red; }' });
+        expect(css).toContain('.custom');
+        expect(css).toContain('color: red');
+      });
+
+      it('should combine all styles', () => {
+        const css = buildCss({
+          includeDefaultStyles: true,
+          nightMode: true,
+          css: '.custom { color: red; }',
+        });
+        expect(css).toContain('.card');
+        expect(css).toContain('nightMode');
+        expect(css).toContain('.custom');
+      });
+    });
+
+    describe('wrapWithStyles', () => {
+      it('should wrap content in card div', () => {
+        const result = wrapWithStyles('Content', '');
+        expect(result).toContain('<div class="card">');
+        expect(result).toContain('Content');
+        expect(result).toContain('</div>');
+      });
+
+      it('should include style tag when CSS provided', () => {
+        const result = wrapWithStyles('Content', '.card { color: blue; }');
+        expect(result).toContain('<style>');
+        expect(result).toContain('.card { color: blue; }');
+        expect(result).toContain('</style>');
+      });
+
+      it('should add nightMode class when enabled', () => {
+        const result = wrapWithStyles('Content', '', true);
+        expect(result).toContain('class="card nightMode"');
+      });
+    });
+
+    describe('createStyledCard', () => {
+      it('should create styled card with default options', () => {
+        const result = createStyledCard('Content');
+        expect(result).toContain('<div class="card">');
+        expect(result).toContain('Content');
+      });
+
+      it('should create styled card with custom CSS', () => {
+        const result = createStyledCard('Content', {
+          css: '.card { background: navy; }',
+        });
+        expect(result).toContain('background: navy');
+      });
+    });
+
+    describe('renderStyledCard', () => {
+      it('should render card with styling', async () => {
+        const result = await renderStyledCard({
+          front: '{{Front}}',
+          back: '{{Back}}',
+          fields: { Front: 'Question', Back: 'Answer' },
+          style: {
+            css: '.card { background: navy; color: white; }',
+          },
+        });
+
+        // Should have raw content
+        expect(result.question).toBe('Question');
+        expect(result.answer).toBe('Answer');
+
+        // Should have styled content
+        expect(result.styledQuestion).toContain('navy');
+        expect(result.styledQuestion).toContain('<div class="card">');
+        expect(result.styledAnswer).toContain('navy');
+      });
+
+      it('should render with default styles', async () => {
+        const result = await renderStyledCard({
+          front: '{{Front}}',
+          back: '{{Back}}',
+          fields: { Front: 'Question', Back: 'Answer' },
+          style: {
+            includeDefaultStyles: true,
+          },
+        });
+
+        expect(result.styledQuestion).toContain('.card');
+        expect(result.styledQuestion).toContain('.cloze');
+      });
+
+      it('should render with night mode', async () => {
+        const result = await renderStyledCard({
+          front: '{{Front}}',
+          back: '{{Back}}',
+          fields: { Front: 'Question', Back: 'Answer' },
+          style: {
+            nightMode: true,
+          },
+        });
+
+        expect(result.styledQuestion).toContain('nightMode');
+        expect(result.styledQuestion).toContain('class="card nightMode"');
+      });
+
+      it('should render cloze with styling', async () => {
+        const result = await renderStyledCard({
+          front: '{{cloze:Text}}',
+          back: '{{cloze:Text}}',
+          fields: { Text: '{{c1::Paris}} is the capital of France' },
+          cardOrdinal: 1,
+          style: {
+            includeDefaultStyles: true,
+          },
+        });
+
+        expect(result.question).toContain('[...]');
+        expect(result.styledQuestion).toContain('<div class="card">');
+        expect(result.styledQuestion).toContain('.cloze');
+      });
     });
   });
 });
