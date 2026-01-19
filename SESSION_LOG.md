@@ -216,3 +216,41 @@ Proto dependencies can be avoided entirely. The proto types are used for the gRP
 **Testing notes:**
 - 54 Rust tests + 24 JavaScript tests + 10 Playwright e2e tests all pass
 - CI workflow updated to run full JS/TS pipeline including Playwright
+
+---
+
+## Agent Session - Issue #7 (Test Fix)
+
+**Worked on:** Issue #7 - Web Component Wrapper (Playwright test alignment)
+
+**What I did:**
+- Found that Playwright tests were failing with 30s timeouts
+- Discovered test file was misaligned with test HTML:
+  - Tests looked for `/test.html` but file was at `/e2e/test.html`
+  - Tests expected `#basic-card` but HTML had `#basic-question`, `#basic-answer`, etc.
+  - Tests expected `#event-log` element that didn't exist
+  - Tests used Playwright locators that can't pierce Shadow DOM
+- Fixed all tests to:
+  - Use correct path `/e2e/test.html`
+  - Use `page.evaluate()` to access Shadow DOM content
+  - Wait for `.content` element to not have `.loading` class
+  - Match element IDs with actual test HTML
+- All 9 Playwright tests now pass
+- Committed and pushed fix, CI passed
+
+**What I learned:**
+- Playwright locators (`.locator('.content')`) don't pierce Shadow DOM by default
+- Must use `page.evaluate()` to access shadow root content
+- Test fixture HTML and test file must be kept in sync
+
+**Codebase facts discovered:**
+- Component renders to `.content` div inside shadow DOM
+- Loading state shown via `.loading` class on content container
+- Component auto-registers when module is imported in browser
+
+**Mistakes made:**
+- Initially tried to create duplicate web-component.ts file before realizing component.ts already existed
+
+**Testing notes:**
+- 54 Rust tests + 19 Jest tests + 9 Playwright e2e tests all pass
+- CI passes
