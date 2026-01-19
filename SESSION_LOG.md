@@ -492,3 +492,35 @@ Proto dependencies can be avoided entirely. The proto types are used for the gRP
 - Used `span.location_line()` and `span.get_utf8_column()` for position
 - Error messages now follow format: "Parse error at line X, column Y: description"
 - Fixed Rust lifetime elision warnings by using explicit `Span<'_>` syntax
+
+---
+
+## Agent Session - Issue #15
+
+**Worked on:** Issue #15 - API Review Before NPM Publish
+
+**What I did:**
+- Reviewed all TypeScript exports in js/src/ (index.ts, types.ts, styles.ts, component.ts)
+- Reviewed web component attributes and events
+- Created API.md documenting the complete public API contract:
+  - Core functions: renderCard, renderStyledCard, renderTemplate, initWasm, etc.
+  - All types: NoteFields, RenderOptions, RenderResult, StyleOptions, etc.
+  - Web component: attributes, events, JavaScript properties
+  - Template syntax reference
+  - API design decisions with rationale
+- Removed unused `CardTemplate` type from exports (was defined but not used in any function signatures)
+- All checks pass (typecheck, lint, 60 tests, build)
+- CI passed successfully
+
+**What I learned:**
+- The API is well-structured with clear separation between core rendering and styling
+- `CardTemplate` was exported but never used - removing unused exports before NPM publish is good hygiene
+- Web component is properly isolated in separate entry point to avoid DOM API issues in Node.js
+
+**API decisions documented:**
+- `cardOrdinal` uses 0 for non-cloze (matches Anki's internal representation)
+- Input uses front/back (template authoring), output uses question/answer (display terminology)
+- `includeDefaultStyles` is opt-in to avoid style conflicts with custom Anki cards
+- Web component in separate entry point to support server-side rendering
+
+**CI Status:** Success
