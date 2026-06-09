@@ -68,8 +68,36 @@ jobs:
       - name: Run Jest tests
         run: npm run test:js
 
+      - name: Setup Python (for the rendering service used by e2e tests)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install rendering service dependencies
+        run: |
+          python -m venv server/.venv
+          server/.venv/bin/pip install -r server/requirements.txt
+
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
       - name: Run Playwright tests
         run: npm run test:e2e
+
+  server-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r server/requirements.txt
+
+      - name: Run server tests
+        run: python -m pytest server/tests/

@@ -2,6 +2,8 @@
  * Anki Card Preview Web Component
  *
  * A custom element for rendering Anki card previews with Shadow DOM isolation.
+ * Rendering is delegated to the anki-renderer service, which wraps the
+ * official Anki engine — output HTML is exactly what Anki desktop produces.
  *
  * @example
  * ```html
@@ -14,17 +16,74 @@
  * ```
  */
 
-import { renderCard, initWasm, DEFAULT_ANKI_CSS, NIGHT_MODE_CSS } from './index.js';
+import { NIGHT_MODE_CSS } from './styles.js';
 import type { NoteFields } from './types.js';
+
+/**
+ * Default rendering service endpoint.
+ */
+export const DEFAULT_SERVICE_URL = 'https://anki-renderer.bjblabs.com/api';
+
+/**
+ * How long attribute changes are coalesced before re-rendering (ms).
+ */
+const RENDER_DEBOUNCE_MS = 50;
+
+/**
+ * An audio/TTS tag extracted by the service from `[sound:...]` / `{{tts ...}}`.
+ */
+export interface AvTag {
+  kind: 'sound' | 'tts';
+  filename?: string;
+  fieldText?: string;
+  lang?: string;
+  voices?: string[];
+  speed?: number;
+}
+
+/**
+ * One rendered card from the service (one per template, or one per cloze
+ * ordinal for cloze note types).
+ */
+export interface RenderedCard {
+  /** Card ordinal (0-indexed; cloze ordinal for cloze note types) */
+  ord: number;
+  /** Template name */
+  name: string;
+  /** True if Anki would not generate this card (front renders empty) */
+  empty: boolean;
+  /** Question HTML, exactly as Anki produces it */
+  question: string;
+  /** Answer HTML, exactly as Anki produces it */
+  answer: string;
+  questionAvTags: AvTag[];
+  answerAvTags: AvTag[];
+}
+
+/**
+ * Response from the rendering service's POST /render endpoint.
+ */
+export interface ServiceRenderResponse {
+  cards: RenderedCard[];
+  /** Note type CSS (the request css, or Anki's stock .card css) */
+  css: string;
+  ankiVersion: string;
+}
 
 /**
  * Event detail for render-complete event
  */
 export interface RenderCompleteDetail {
-  /** The rendered HTML content */
+  /** The rendered HTML content (after audio markers are replaced) */
   content: string;
   /** Which side was rendered */
   side: 'question' | 'answer';
+  /** The card that was displayed */
+  card: RenderedCard;
+  /** All cards returned by the service */
+  cards: RenderedCard[];
+  /** Version of the Anki engine that rendered the card */
+  ankiVersion: string;
 }
 
 /**
@@ -45,10 +104,12 @@ export interface RenderErrorDetail {
  * - `template-back`: Template for the answer side
  * - `fields`: JSON object of field name/value pairs
  * - `side`: Which side to display ("question" or "answer")
- * - `card-ordinal`: Card ordinal for cloze cards (1-indexed, optional)
- * - `css`: Custom CSS to apply to the card
+ * - `cloze`: Treat the note type as cloze - boolean attribute
+ * - `card-ord`: Which card to display, by 0-indexed ordinal (for cloze, one
+ *   card exists per cloze ordinal). Defaults to the first non-empty card.
+ * - `css`: Note type CSS (replaces Anki's stock .card css, as in Anki)
  * - `night-mode`: Enable night mode (dark theme) - boolean attribute
- * - `default-styles`: Include Anki's default styles - boolean attribute
+ * - `service-url`: Base URL of the rendering service
  *
  * Events:
  * - `render-complete`: Fired when rendering succeeds
@@ -57,12 +118,24 @@ export interface RenderErrorDetail {
 export class AnkiCardPreview extends HTMLElement {
   private shadow: ShadowRoot;
   private baseStyleElement: HTMLStyleElement;
-  private customStyleElement: HTMLStyleElement;
+  private cardStyleElement: HTMLStyleElement;
   private contentContainer: HTMLDivElement;
   private initialized = false;
+  private renderTimer: ReturnType<typeof setTimeout> | null = null;
+  private renderSeq = 0;
 
   static get observedAttributes(): string[] {
-    return ['template-front', 'template-back', 'fields', 'side', 'card-ordinal', 'css', 'night-mode', 'default-styles'];
+    return [
+      'template-front',
+      'template-back',
+      'fields',
+      'side',
+      'cloze',
+      'card-ord',
+      'css',
+      'night-mode',
+      'service-url',
+    ];
   }
 
   constructor() {
@@ -93,21 +166,15 @@ export class AnkiCardPreview extends HTMLElement {
         color: #6c757d;
         font-style: italic;
       }
-      /* Fallback styles if no custom CSS is provided */
-      .cloze {
-        font-weight: bold;
-        color: #0000ff;
-      }
-      .hint {
-        background-color: #ffffcc;
-        padding: 2px 4px;
-        border-radius: 2px;
-        cursor: pointer;
+      .replay-button {
+        display: inline-block;
+        cursor: default;
+        color: #0a5;
       }
     `;
 
-    // Custom style element for user CSS, default styles, night mode
-    this.customStyleElement = document.createElement('style');
+    // Style element for the note type CSS returned by the service
+    this.cardStyleElement = document.createElement('style');
 
     // Create content container (with .card class for CSS targeting)
     this.contentContainer = document.createElement('div');
@@ -115,17 +182,21 @@ export class AnkiCardPreview extends HTMLElement {
     this.contentContainer.textContent = 'Loading...';
 
     this.shadow.appendChild(this.baseStyleElement);
-    this.shadow.appendChild(this.customStyleElement);
+    this.shadow.appendChild(this.cardStyleElement);
     this.shadow.appendChild(this.contentContainer);
   }
 
   connectedCallback(): void {
     this.initialized = true;
-    this.render();
+    this.scheduleRender();
   }
 
   disconnectedCallback(): void {
     this.initialized = false;
+    if (this.renderTimer !== null) {
+      clearTimeout(this.renderTimer);
+      this.renderTimer = null;
+    }
   }
 
   attributeChangedCallback(
@@ -134,9 +205,9 @@ export class AnkiCardPreview extends HTMLElement {
     _newValue: string | null
   ): void {
     if (this.initialized) {
-      this.render();
+      this.scheduleRender();
     }
-    // If not initialized, render() will be called in connectedCallback
+    // If not initialized, render is scheduled in connectedCallback
   }
 
   /**
@@ -191,19 +262,41 @@ export class AnkiCardPreview extends HTMLElement {
   }
 
   /**
-   * Get the card ordinal for cloze cards (1-indexed, 0 for non-cloze)
+   * Get whether the note type is treated as cloze
    */
-  get cardOrdinal(): number {
-    const ordinal = parseInt(this.getAttribute('card-ordinal') || '0', 10);
-    return isNaN(ordinal) ? 0 : ordinal;
+  get cloze(): boolean {
+    return this.hasAttribute('cloze');
   }
 
-  set cardOrdinal(value: number) {
-    this.setAttribute('card-ordinal', String(value));
+  set cloze(value: boolean) {
+    if (value) {
+      this.setAttribute('cloze', '');
+    } else {
+      this.removeAttribute('cloze');
+    }
   }
 
   /**
-   * Get custom CSS for the card
+   * Get the card ordinal to display (0-indexed), or null to auto-pick
+   * the first non-empty card.
+   */
+  get cardOrd(): number | null {
+    const attr = this.getAttribute('card-ord');
+    if (attr === null || attr === '') return null;
+    const ord = parseInt(attr, 10);
+    return isNaN(ord) ? null : ord;
+  }
+
+  set cardOrd(value: number | null) {
+    if (value === null) {
+      this.removeAttribute('card-ord');
+    } else {
+      this.setAttribute('card-ord', String(value));
+    }
+  }
+
+  /**
+   * Get the note type CSS for the card
    */
   get css(): string {
     return this.getAttribute('css') || '';
@@ -229,82 +322,135 @@ export class AnkiCardPreview extends HTMLElement {
   }
 
   /**
-   * Get whether default Anki styles should be included
+   * Get the rendering service base URL
    */
-  get defaultStyles(): boolean {
-    return this.hasAttribute('default-styles');
+  get serviceUrl(): string {
+    const url = this.getAttribute('service-url') || DEFAULT_SERVICE_URL;
+    return url.replace(/\/+$/, '');
   }
 
-  set defaultStyles(value: boolean) {
-    if (value) {
-      this.setAttribute('default-styles', '');
-    } else {
-      this.removeAttribute('default-styles');
-    }
+  set serviceUrl(value: string) {
+    this.setAttribute('service-url', value);
   }
 
   /**
-   * Build the combined CSS for the card
+   * Schedule a debounced render. Multiple attribute changes within the
+   * debounce window result in a single service call.
    */
-  private buildCardCss(): string {
-    const parts: string[] = [];
-
-    if (this.defaultStyles) {
-      parts.push(DEFAULT_ANKI_CSS);
+  private scheduleRender(): void {
+    if (this.renderTimer !== null) {
+      clearTimeout(this.renderTimer);
     }
-
-    if (this.nightMode) {
-      parts.push(NIGHT_MODE_CSS);
-    }
-
-    if (this.css) {
-      parts.push(this.css);
-    }
-
-    return parts.join('\n');
+    this.renderTimer = setTimeout(() => {
+      this.renderTimer = null;
+      void this.render();
+    }, RENDER_DEBOUNCE_MS);
   }
 
   /**
-   * Programmatically trigger a re-render
+   * Replace Anki's `[anki:play:q:0]` audio markers with a ▶ placeholder
+   * (display-accurate; no playback).
+   */
+  private static replaceAvMarkers(html: string): string {
+    return html.replace(
+      /\[anki:play:[qa]:\d+\]/g,
+      '<span class="replay-button" title="Audio">▶</span>'
+    );
+  }
+
+  /**
+   * Pick which card to display: explicit card-ord if set, otherwise the
+   * first card Anki would actually generate, otherwise the first card.
+   */
+  private pickCard(cards: RenderedCard[]): RenderedCard {
+    const ord = this.cardOrd;
+    if (ord !== null) {
+      const match = cards.find((c) => c.ord === ord);
+      if (!match) {
+        throw new Error(
+          `no card with ordinal ${ord} (got: ${cards.map((c) => c.ord).join(', ')})`
+        );
+      }
+      return match;
+    }
+    return cards.find((c) => !c.empty) || cards[0];
+  }
+
+  /**
+   * Programmatically trigger a re-render (calls the rendering service).
    */
   async render(): Promise<void> {
     if (!this.initialized) {
-      // Will be called again from connectedCallback
+      // Will be scheduled again from connectedCallback
       return;
     }
 
-    const front = this.templateFront;
-    const back = this.templateBack;
-    const fields = this.fields;
+    const seq = ++this.renderSeq;
     const side = this.side;
-    const cardOrdinal = this.cardOrdinal;
-
-    // Update custom CSS
-    this.customStyleElement.textContent = this.buildCardCss();
 
     // Show loading state
     this.contentContainer.className = 'content card loading';
     this.contentContainer.textContent = 'Loading...';
 
     try {
-      // Ensure WASM is initialized
-      await initWasm();
+      const fields = this.fields;
+      if (Object.keys(fields).length === 0) {
+        throw new Error('fields attribute must be a JSON object with at least one field');
+      }
 
-      // Render the card
-      const result = await renderCard({
-        front,
-        back,
+      const body: Record<string, unknown> = {
+        templates: [
+          { front: this.templateFront, back: this.templateBack, name: 'Card 1' },
+        ],
         fields,
-        cardOrdinal,
+        cloze: this.cloze,
+      };
+      if (this.css) {
+        body.css = this.css;
+      }
+
+      const response = await fetch(`${this.serviceUrl}/render`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
       });
 
-      // Display the requested side
-      const content = side === 'answer' ? result.answer : result.question;
+      if (!response.ok) {
+        let detail = `service responded with ${response.status}`;
+        try {
+          const errBody = await response.json();
+          if (typeof errBody.detail === 'string') {
+            detail = errBody.detail;
+          } else if (errBody.detail) {
+            detail = JSON.stringify(errBody.detail);
+          }
+        } catch {
+          // Keep the status-based message
+        }
+        throw new Error(detail);
+      }
 
-      // Set classes including nightMode if enabled
+      const data: ServiceRenderResponse = await response.json();
+
+      // A newer render started while this one was in flight — drop it
+      if (seq !== this.renderSeq) {
+        return;
+      }
+
+      const card = this.pickCard(data.cards);
+      const raw = side === 'answer' ? card.answer : card.question;
+      const content = AnkiCardPreview.replaceAvMarkers(raw);
+
+      // Inject the note type CSS so it applies as in Anki; night mode
+      // overrides come after so they win the cascade
+      this.cardStyleElement.textContent = this.nightMode
+        ? `${data.css}\n${NIGHT_MODE_CSS}`
+        : data.css;
+
+      // Standard Anki classes so note type CSS applies as in Anki
       const classes = ['content', 'card'];
       if (this.nightMode) {
-        classes.push('nightMode');
+        classes.push('night_mode', 'nightMode');
       }
       this.contentContainer.className = classes.join(' ');
       this.contentContainer.innerHTML = content;
@@ -312,12 +458,15 @@ export class AnkiCardPreview extends HTMLElement {
       // Dispatch success event
       this.dispatchEvent(
         new CustomEvent<RenderCompleteDetail>('render-complete', {
-          detail: { content, side },
+          detail: { content, side, card, cards: data.cards, ankiVersion: data.ankiVersion },
           bubbles: true,
           composed: true,
         })
       );
     } catch (error) {
+      if (seq !== this.renderSeq) {
+        return;
+      }
       const message = error instanceof Error ? error.message : String(error);
 
       this.contentContainer.className = 'content card error';

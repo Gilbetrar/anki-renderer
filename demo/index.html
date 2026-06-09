@@ -9,7 +9,7 @@
 <body>
   <header>
     <h1>anki-renderer</h1>
-    <p class="tagline">Anki card template renderer compiled to WebAssembly</p>
+    <p class="tagline">Pixel-accurate Anki card previews, rendered by Anki's official engine</p>
     <nav>
       <a href="#demo">Demo</a>
       <a href="#examples">Examples</a>
@@ -42,21 +42,21 @@
 
           <div class="options-row">
             <div class="editor-group">
-              <label for="card-ordinal">Cloze Card # (0 for non-cloze)</label>
-              <input type="number" id="card-ordinal" value="0" min="0">
+              <label for="card-ord">Card ordinal (0 = first card / first cloze)</label>
+              <input type="number" id="card-ord" value="0" min="0">
             </div>
             <div class="checkbox-group">
               <label>
-                <input type="checkbox" id="night-mode"> Night Mode
+                <input type="checkbox" id="cloze"> Cloze Note Type
               </label>
               <label>
-                <input type="checkbox" id="default-styles" checked> Default Styles
+                <input type="checkbox" id="night-mode"> Night Mode
               </label>
             </div>
           </div>
 
           <div class="editor-group">
-            <label for="custom-css">Custom CSS (optional)</label>
+            <label for="custom-css">Note type CSS (optional — defaults to Anki's stock styling)</label>
             <textarea id="custom-css" rows="3" placeholder=".card { font-size: 24px; }"></textarea>
           </div>
         </div>
@@ -112,7 +112,13 @@
 
         <div class="example-card" data-example="filters">
           <h3>Filters</h3>
-          <p>Text processing with filters like text: and type:.</p>
+          <p>Text processing with filters like text:.</p>
+          <button class="try-btn">Try it</button>
+        </div>
+
+        <div class="example-card" data-example="punctuated">
+          <h3>Punctuated Field Names</h3>
+          <p>Field names with parentheses and commas — exactly as Anki handles them.</p>
           <button class="try-btn">Try it</button>
         </div>
       </div>
@@ -122,57 +128,16 @@
       <h2>API Reference</h2>
 
       <div class="api-section">
-        <h3>Installation</h3>
-        <pre><code>npm install anki-renderer</code></pre>
-      </div>
-
-      <div class="api-section">
-        <h3>Basic Usage</h3>
-        <pre><code>import { renderCard, initWasm } from 'anki-renderer';
-
-// Initialize WASM (optional - auto-initializes on first render)
-await initWasm();
-
-// Render a card
-const result = await renderCard({
-  front: "{{Front}}",
-  back: "{{FrontSide}}&lt;hr&gt;{{Back}}",
-  fields: { Front: "Question", Back: "Answer" },
-});
-
-console.log(result.question); // "Question"
-console.log(result.answer);   // "Question&lt;hr&gt;Answer"</code></pre>
-      </div>
-
-      <div class="api-section">
-        <h3>Cloze Deletions</h3>
-        <pre><code>const result = await renderCard({
-  front: "{{cloze:Text}}",
-  back: "{{cloze:Text}}",
-  fields: { Text: "{{c1::Paris}} is the capital of {{c2::France}}" },
-  cardOrdinal: 1,
-});
-
-// Card 1: "[...]" is visible, "France" is visible
-// Card 2: "Paris" is visible, "[...]" is visible</code></pre>
-      </div>
-
-      <div class="api-section">
-        <h3>Styled Cards</h3>
-        <pre><code>import { renderStyledCard, DEFAULT_ANKI_CSS } from 'anki-renderer';
-
-const result = await renderStyledCard({
-  front: "{{Front}}",
-  back: "{{Back}}",
-  fields: { Front: "Question", Back: "Answer" },
-  style: {
-    css: ".card { background: navy; color: white; }",
-    includeDefaultStyles: true,
-    nightMode: false,
-  },
-});
-
-// result.styledQuestion includes &lt;style&gt; tag and .card wrapper</code></pre>
+        <h3>Rendering Service</h3>
+        <p>Cards are rendered server-side by the official Anki engine. The HTTP API is public:</p>
+        <pre><code>curl -s https://anki-renderer.bjblabs.com/api/render \
+  -H 'Content-Type: application/json' -d '{
+    "templates": [{"front": "{{Front}}", "back": "{{FrontSide}}&lt;hr&gt;{{Back}}"}],
+    "fields": {"Front": "What is 2 + 2?", "Back": "4"}
+  }'</code></pre>
+        <p>The response contains one entry per card (or per cloze ordinal with
+        <code>"cloze": true</code>) with <code>question</code>/<code>answer</code> HTML exactly
+        as Anki produces it, plus the note type CSS and engine version.</p>
       </div>
 
       <div class="api-section">
@@ -186,9 +151,33 @@ const result = await renderStyledCard({
   template-back="{{Word}}&lt;br&gt;{{Definition}}"
   fields='{"Word": "hello", "Definition": "greeting"}'
   side="question"
-  default-styles
   night-mode&gt;
 &lt;/anki-card-preview&gt;</code></pre>
+        <p>Attributes: <code>template-front</code>, <code>template-back</code>, <code>fields</code>,
+        <code>side</code>, <code>cloze</code>, <code>card-ord</code>, <code>css</code>,
+        <code>night-mode</code>, <code>service-url</code>. Events:
+        <code>render-complete</code>, <code>render-error</code>.</p>
+      </div>
+
+      <div class="api-section">
+        <h3>Cloze Deletions</h3>
+        <pre><code>&lt;anki-card-preview
+  template-front="{{cloze:Text}}"
+  template-back="{{cloze:Text}}"
+  fields='{"Text": "{{c1::Paris}} is the capital of {{c2::France}}"}'
+  cloze
+  card-ord="0"&gt;
+&lt;/anki-card-preview&gt;
+
+&lt;!-- card-ord 0: "[...]" shown, "France" visible --&gt;
+&lt;!-- card-ord 1: "Paris" visible, "[...]" shown --&gt;</code></pre>
+      </div>
+
+      <div class="api-section">
+        <h3>Limitations</h3>
+        <p>Media files are not served: <code>&lt;img&gt;</code> tags in fields render as-is, so
+        images stored in Anki's media folder won't resolve. Audio/TTS tags display as a
+        ▶ placeholder without playback.</p>
       </div>
 
       <div class="api-section">
@@ -244,7 +233,8 @@ const result = await renderStyledCard({
   </main>
 
   <footer>
-    <p>Built with WASM for fast, client-side Anki card rendering.</p>
+    <p>Cards rendered by the official Anki engine via the anki-renderer service.</p>
+    <p id="engine-version">Checking rendering engine…</p>
     <p><a href="https://github.com/Gilbetrar/anki-renderer">View on GitHub</a></p>
   </footer>
 

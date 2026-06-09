@@ -35,12 +35,58 @@ server/.venv/bin/python -m pytest server/tests/                # test suite
 server/.venv/bin/python -m server.differential                 # fidelity check vs live Anki (needs AnkiConnect)
 ```
 
+## Web component
+
+`<anki-card-preview>` renders cards through the service (no WASM in the
+component bundle):
+
+```html
+<script type="module">
+  import 'anki-renderer/component';
+</script>
+
+<anki-card-preview
+  template-front="{{Front}}"
+  template-back="{{FrontSide}}<hr>{{Back}}"
+  fields='{"Front": "Hello", "Back": "World"}'
+  side="question"
+></anki-card-preview>
+```
+
+Attributes:
+
+- `template-front` / `template-back` — card templates
+- `fields` — JSON object of field name/value pairs
+- `side` — `question` or `answer`
+- `cloze` — boolean attribute; treat the note type as cloze (the service
+  returns one card per cloze ordinal)
+- `card-ord` — which card to display, by 0-indexed ordinal (defaults to the
+  first card Anki would generate)
+- `css` — note type CSS (replaces Anki's stock `.card` css, as in Anki)
+- `night-mode` — boolean attribute; applies `night_mode`/`nightMode` classes
+  and dark base styles
+- `service-url` — rendering service base URL (defaults to the public service)
+
+Events: `render-complete` (detail: `content`, `side`, `card`, `cards`,
+`ankiVersion`) and `render-error` (detail: `message`, `error`). Attribute
+changes are debounced into a single re-render.
+
+### Limitations
+
+- **Media files are not served.** `<img>` tags in fields render as-is, so
+  images stored in Anki's media folder won't resolve unless the page can
+  reach them by the same path.
+- **No audio playback or type-in grading.** Audio/TTS tags render as a ▶
+  placeholder; the parsed tags are available on `render-complete` via
+  `card.questionAvTags` / `card.answerAvTags`.
+
 ## WASM renderer (legacy)
 
 The original approach below — a Rust reimplementation of Anki's template
-engine compiled to WebAssembly — still powers the demo site, but has known
-fidelity gaps (see issue #20 and API.md) and is superseded by the rendering
-service for accuracy-critical use.
+engine compiled to WebAssembly — is still available as the `renderCard`
+JavaScript API, but has known fidelity gaps (see issue #20 and API.md) and
+is superseded by the rendering service for accuracy-critical use. The demo
+site and web component now use the service.
 
 ## Features
 
@@ -48,7 +94,6 @@ service for accuracy-critical use.
 - Cloze deletions (`{{c1::text}}`, `{{c1::text::hint}}`)
 - Template filters (`text`, `hint`, `type`, `furigana`, `kanji`, `kana`)
 - TypeScript/JavaScript bindings with ergonomic API
-- Web component (`<anki-card-preview>`) for easy embedding
 - CSS styling support (default Anki styles, night mode, custom CSS)
 
 ## Installation
@@ -76,22 +121,6 @@ console.log(result.question); // "What is 2 + 2?"
 console.log(result.answer);   // "What is 2 + 2?<hr>4"
 ```
 
-### Web Component
-
-```html
-<script type="module">
-  import 'anki-renderer/component';
-</script>
-
-<anki-card-preview
-  template-front="{{Front}}"
-  template-back="{{FrontSide}}<hr>{{Back}}"
-  fields='{"Front": "Hello", "Back": "World"}'
-  side="question"
-  default-styles
-></anki-card-preview>
-```
-
 ## Development
 
 ### Prerequisites
@@ -117,7 +146,8 @@ npm run build:ts                         # TypeScript
 ```bash
 cargo test          # Rust tests
 npm run test:js     # Jest tests
-npm run test:e2e    # Playwright tests
+npm run test:e2e    # Playwright tests (starts the rendering service from server/.venv)
+server/.venv/bin/python -m pytest server/tests/   # rendering service tests
 ```
 
 ### Demo Site

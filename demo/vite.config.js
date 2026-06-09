@@ -6,6 +6,24 @@ import { copyFileSync, mkdirSync, existsSync, readdirSync, readFileSync, writeFi
 function copyAssetsPlugin() {
   return {
     name: 'copy-assets',
+    // In dev, serve the repo's dist/ at /lib/ so the demo uses the same
+    // import path as production builds
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (!req.url || !req.url.startsWith('/lib/')) return next();
+        const name = req.url.split('?')[0].slice('/lib/'.length);
+        const file = resolve(__dirname, '..', 'dist', name);
+        if (!name.includes('..') && existsSync(file)) {
+          res.setHeader(
+            'Content-Type',
+            name.endsWith('.js') ? 'application/javascript' : 'application/json'
+          );
+          res.end(readFileSync(file));
+        } else {
+          next();
+        }
+      });
+    },
     closeBundle() {
       const distOut = resolve(__dirname, 'dist');
       const pkgOut = resolve(distOut, 'pkg');

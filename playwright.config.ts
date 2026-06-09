@@ -11,9 +11,19 @@ export default defineConfig({
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
   },
-  webServer: {
-    command: 'npx serve -l 3000 .',
-    port: 3000,
-    reuseExistingServer: !process.env.CI,
-  },
+  webServer: [
+    {
+      command: 'npx serve -l 3000 .',
+      port: 3000,
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      // Local rendering service (on the Mac mini the deployed service already
+      // listens on 9003, so an already-running instance is reused locally)
+      command: 'server/.venv/bin/python -m uvicorn server.app:app --port 9003',
+      url: 'http://localhost:9003/healthz',
+      reuseExistingServer: !process.env.CI,
+      timeout: 60000,
+    },
+  ],
 });
