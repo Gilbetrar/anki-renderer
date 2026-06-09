@@ -30,3 +30,9 @@ node_modules/
 .DS_Store
 Thumbs.db
 SIGNAL.txt
+
+# Python rendering service
+server/.venv/
+server/data/
+__pycache__/
+*.pyc

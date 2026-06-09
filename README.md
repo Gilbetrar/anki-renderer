@@ -1,8 +1,46 @@
 # anki-renderer
 
-Anki card template renderer compiled to WebAssembly.
+Pixel-accurate Anki card previews for web apps.
 
-**[Live Demo](https://anki-renderer.bjblabs.com)** | [GitHub](https://github.com/Gilbetrar/anki-renderer)
+**[Live Demo](https://anki-renderer.bjblabs.com)** | **Rendering API:** `https://anki-renderer.bjblabs.com/api/render` | [GitHub](https://github.com/Gilbetrar/anki-renderer)
+
+## Rendering service (current approach)
+
+`server/` wraps the **official `anki` Python package** — Anki's real Rust
+rendering engine — in a small FastAPI service. Output is byte-identical to
+what Anki desktop renders (verified against a live collection: 102/102 cards
+across 17 note types, including image occlusion, cloze, and type-in-answer).
+There is no reimplemented template engine to drift out of sync.
+
+```bash
+curl -s https://anki-renderer.bjblabs.com/api/render \
+  -H 'Content-Type: application/json' -d '{
+    "templates": [{"front": "{{Front}}", "back": "{{FrontSide}}<hr id=answer>{{Back}}"}],
+    "fields": {"Front": "What is 2 + 2?", "Back": "4"}
+  }'
+```
+
+Response: one entry per card with `question`/`answer` HTML, `empty` (would
+Anki generate this card?), extracted audio/TTS tags, plus the note type CSS
+and engine version. Cloze note types (`"cloze": true`) return one card per
+cloze ordinal. `deckName`, `tags`, and `modelName` are honored so special
+fields (`{{Deck}}`, `{{Tags}}`, `{{Type}}`, …) render correctly.
+
+Run locally:
+
+```bash
+cd server && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+cd .. && server/.venv/bin/uvicorn server.app:app --port 9003   # from repo root
+server/.venv/bin/python -m pytest server/tests/                # test suite
+server/.venv/bin/python -m server.differential                 # fidelity check vs live Anki (needs AnkiConnect)
+```
+
+## WASM renderer (legacy)
+
+The original approach below — a Rust reimplementation of Anki's template
+engine compiled to WebAssembly — still powers the demo site, but has known
+fidelity gaps (see issue #20 and API.md) and is superseded by the rendering
+service for accuracy-critical use.
 
 ## Features
 
