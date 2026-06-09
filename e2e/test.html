@@ -35,11 +35,13 @@
 </head>
 <body>
   <h1>Anki Card Preview Component Tests</h1>
+  <p>These cards render against a local rendering service at <code>localhost:9003</code>.</p>
 
   <div class="test-card">
     <h3>Basic Card - Question Side</h3>
     <anki-card-preview
       id="basic-question"
+      service-url="http://localhost:9003"
       template-front="{{Word}}"
       template-back="{{Word}}<br>{{Definition}}"
       fields='{"Word": "こんにちは", "Definition": "Hello"}'
@@ -51,6 +53,7 @@
     <h3>Basic Card - Answer Side</h3>
     <anki-card-preview
       id="basic-answer"
+      service-url="http://localhost:9003"
       template-front="{{Word}}"
       template-back="{{FrontSide}}<hr>{{Definition}}"
       fields='{"Word": "こんにちは", "Definition": "Hello"}'
@@ -59,26 +62,44 @@
   </div>
 
   <div class="test-card">
-    <h3>Cloze Card - Question Side</h3>
+    <h3>Cloze Card - Question Side (c1, ord 0)</h3>
     <anki-card-preview
       id="cloze-question"
+      service-url="http://localhost:9003"
       template-front="{{cloze:Text}}"
       template-back="{{cloze:Text}}"
       fields='{"Text": "{{c1::Paris}} is the capital of {{c2::France}}"}'
-      card-ordinal="1"
+      cloze
+      card-ord="0"
       side="question">
     </anki-card-preview>
   </div>
 
   <div class="test-card">
-    <h3>Cloze Card - Answer Side</h3>
+    <h3>Cloze Card - Answer Side (c1, ord 0)</h3>
     <anki-card-preview
       id="cloze-answer"
+      service-url="http://localhost:9003"
       template-front="{{cloze:Text}}"
       template-back="{{cloze:Text}}"
       fields='{"Text": "{{c1::Paris}} is the capital of {{c2::France}}"}'
-      card-ordinal="1"
+      cloze
+      card-ord="0"
       side="answer">
+    </anki-card-preview>
+  </div>
+
+  <div class="test-card">
+    <h3>Cloze Card - Second Ordinal (c2, ord 1)</h3>
+    <anki-card-preview
+      id="cloze-second"
+      service-url="http://localhost:9003"
+      template-front="{{cloze:Text}}"
+      template-back="{{cloze:Text}}"
+      fields='{"Text": "{{c1::Paris}} is the capital of {{c2::France}}"}'
+      cloze
+      card-ord="1"
+      side="question">
     </anki-card-preview>
   </div>
 
@@ -86,6 +107,7 @@
     <h3>With Hint Filter</h3>
     <anki-card-preview
       id="hint-card"
+      service-url="http://localhost:9003"
       template-front="What is 2+2? {{hint:Hint}}"
       template-back="{{FrontSide}}<hr>{{Answer}}"
       fields='{"Hint": "Think of counting fingers", "Answer": "4"}'
@@ -94,9 +116,34 @@
   </div>
 
   <div class="test-card">
+    <h3>Punctuated Field Name (issue #20 reproduction)</h3>
+    <anki-card-preview
+      id="punctuated-card"
+      service-url="http://localhost:9003"
+      template-front="{{Source (book, article, etc.)}}"
+      template-back="{{FrontSide}}<hr>{{Notes}}"
+      fields='{"Source (book, article, etc.)": "How to Take Smart Notes", "Notes": "Write it down"}'
+      side="question">
+    </anki-card-preview>
+  </div>
+
+  <div class="test-card">
+    <h3>Audio Field (placeholder, no playback)</h3>
+    <anki-card-preview
+      id="audio-card"
+      service-url="http://localhost:9003"
+      template-front="Listen: {{Audio}}"
+      template-back="{{Audio}}"
+      fields='{"Audio": "[sound:test.mp3]"}'
+      side="question">
+    </anki-card-preview>
+  </div>
+
+  <div class="test-card">
     <h3>Dynamic Card (for programmatic updates)</h3>
     <anki-card-preview
       id="dynamic-card"
+      service-url="http://localhost:9003"
       template-front="{{Front}}"
       template-back="{{Back}}"
       fields='{"Front": "Initial question", "Back": "Initial answer"}'

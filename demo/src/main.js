@@ -1,20 +1,15 @@
 /**
- * Demo site main script
+ * Demo site main script.
+ *
+ * Drives an <anki-card-preview> web component, which renders cards through
+ * the anki-renderer service (Anki's official engine) — no WASM involved.
  */
 
-// Dynamic import based on environment
-const isProduction = import.meta.env.PROD;
-const libPath = isProduction ? '/lib/index.js' : '../../dist/index.js';
+// Served from the repo's dist/ in dev (vite middleware) and from a copied
+// lib/ directory in production builds
+const componentPath = '/lib/component.js';
 
-let renderCard, initWasm, DEFAULT_ANKI_CSS, NIGHT_MODE_CSS;
-
-async function loadLibrary() {
-  const lib = await import(/* @vite-ignore */ libPath);
-  renderCard = lib.renderCard;
-  initWasm = lib.initWasm;
-  DEFAULT_ANKI_CSS = lib.DEFAULT_ANKI_CSS;
-  NIGHT_MODE_CSS = lib.NIGHT_MODE_CSS;
-}
+const SERVICE_URL = 'https://anki-renderer.bjblabs.com/api';
 
 // Example configurations
 const EXAMPLES = {
@@ -22,35 +17,40 @@ const EXAMPLES = {
     front: '{{Front}}',
     back: '{{FrontSide}}<hr>{{Back}}',
     fields: { Front: 'What is 2 + 2?', Back: '4' },
-    cardOrdinal: 0,
+    cloze: false,
+    cardOrd: 0,
     css: '',
   },
   cloze: {
     front: '{{cloze:Text}}',
     back: '{{cloze:Text}}',
     fields: { Text: '{{c1::Paris}} is the capital of {{c2::France}}' },
-    cardOrdinal: 1,
+    cloze: true,
+    cardOrd: 0,
     css: '',
   },
   hint: {
     front: 'What color is the sky?\n\n{{hint:Hint}}',
     back: '{{FrontSide}}<hr>{{Answer}}',
     fields: { Hint: 'Look up on a clear day', Answer: 'Blue' },
-    cardOrdinal: 0,
+    cloze: false,
+    cardOrd: 0,
     css: '',
   },
   furigana: {
     front: '{{furigana:Word}}',
     back: '{{furigana:Word}}<hr>{{Meaning}}',
     fields: { Word: '日本語[にほんご]', Meaning: 'Japanese language' },
-    cardOrdinal: 0,
+    cloze: false,
+    cardOrd: 0,
     css: '',
   },
   styled: {
     front: '{{Front}}',
     back: '{{FrontSide}}<hr>{{Back}}',
     fields: { Front: 'Styled card example', Back: 'With custom colors!' },
-    cardOrdinal: 0,
+    cloze: false,
+    cardOrd: 0,
     css: `.card {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
@@ -59,10 +59,22 @@ const EXAMPLES = {
 }`,
   },
   filters: {
-    front: 'HTML content: {{text:Content}}\n\nType your answer: {{type:Answer}}',
-    back: '{{FrontSide}}<hr>Correct: {{Answer}}',
-    fields: { Content: '<b>Bold</b> and <i>italic</i>', Answer: 'test' },
-    cardOrdinal: 0,
+    front: 'HTML content: {{text:Content}}',
+    back: '{{FrontSide}}<hr>{{Content}}',
+    fields: { Content: '<b>Bold</b> and <i>italic</i>' },
+    cloze: false,
+    cardOrd: 0,
+    css: '',
+  },
+  punctuated: {
+    front: '{{Source (book, article, etc.)}}',
+    back: '{{FrontSide}}<hr>{{Notes}}',
+    fields: {
+      'Source (book, article, etc.)': 'How to Take Smart Notes',
+      Notes: 'Field names with punctuation render fine — this broke the old WASM renderer (issue #20).',
+    },
+    cloze: false,
+    cardOrd: 0,
     css: '',
   },
 };
@@ -71,17 +83,17 @@ const EXAMPLES = {
 let templateFront;
 let templateBack;
 let fieldsJson;
-let cardOrdinal;
+let clozeCheckbox;
+let cardOrd;
 let nightMode;
-let defaultStyles;
 let customCss;
 let cardPreview;
 let previewContainer;
 let showQuestion;
 let showAnswer;
 
-let currentSide = 'question';
-let lastResult = null;
+/** The <anki-card-preview> element driving the preview */
+let preview;
 
 /**
  * Initialize the demo
@@ -91,35 +103,40 @@ async function init() {
   templateFront = document.getElementById('template-front');
   templateBack = document.getElementById('template-back');
   fieldsJson = document.getElementById('fields-json');
-  cardOrdinal = document.getElementById('card-ordinal');
+  clozeCheckbox = document.getElementById('cloze');
+  cardOrd = document.getElementById('card-ord');
   nightMode = document.getElementById('night-mode');
-  defaultStyles = document.getElementById('default-styles');
   customCss = document.getElementById('custom-css');
   cardPreview = document.getElementById('card-preview');
   previewContainer = document.getElementById('preview-container');
   showQuestion = document.getElementById('show-question');
   showAnswer = document.getElementById('show-answer');
 
-  // Load library and initialize WASM
+  // Load the web component (registers <anki-card-preview>)
   try {
-    cardPreview.innerHTML = '<div style="color: #666;">Loading library...</div>';
-    await loadLibrary();
-    await initWasm();
-    console.log('WASM initialized');
+    cardPreview.innerHTML = '<div style="color: #666;">Loading component...</div>';
+    await import(/* @vite-ignore */ componentPath);
   } catch (error) {
-    console.error('Failed to initialize:', error);
-    cardPreview.innerHTML = `<div style="color: red;">Failed to load renderer: ${error.message}</div>`;
+    console.error('Failed to load component:', error);
+    cardPreview.innerHTML = `<div style="color: red;">Failed to load component: ${error.message}</div>`;
     return;
   }
 
-  // Set up event listeners
-  templateFront.addEventListener('input', render);
-  templateBack.addEventListener('input', render);
-  fieldsJson.addEventListener('input', render);
-  cardOrdinal.addEventListener('input', render);
-  nightMode.addEventListener('change', render);
-  defaultStyles.addEventListener('change', render);
-  customCss.addEventListener('input', render);
+  // Create the preview element
+  preview = document.createElement('anki-card-preview');
+  preview.setAttribute('service-url', SERVICE_URL);
+  preview.setAttribute('side', 'question');
+  cardPreview.innerHTML = '';
+  cardPreview.appendChild(preview);
+
+  // Set up event listeners (the component debounces re-renders itself)
+  templateFront.addEventListener('input', syncPreview);
+  templateBack.addEventListener('input', syncPreview);
+  fieldsJson.addEventListener('input', syncPreview);
+  clozeCheckbox.addEventListener('change', syncPreview);
+  cardOrd.addEventListener('input', syncPreview);
+  nightMode.addEventListener('change', syncPreview);
+  customCss.addEventListener('input', syncPreview);
 
   showQuestion.addEventListener('click', () => setSide('question'));
   showAnswer.addEventListener('click', () => setSide('answer'));
@@ -131,18 +148,35 @@ async function init() {
     btn.addEventListener('click', () => loadExample(exampleKey));
   });
 
+  // Show the engine version in the footer
+  showEngineVersion();
+
   // Initial render
-  await render();
+  syncPreview();
+}
+
+/**
+ * Fetch the service health check and display the Anki engine version.
+ */
+async function showEngineVersion() {
+  const versionEl = document.getElementById('engine-version');
+  if (!versionEl) return;
+  try {
+    const res = await fetch(`${SERVICE_URL}/healthz`);
+    const data = await res.json();
+    versionEl.textContent = `Rendering engine: Anki ${data.ankiVersion}`;
+  } catch {
+    versionEl.textContent = 'Rendering service unreachable';
+  }
 }
 
 /**
  * Set which side to display
  */
 function setSide(side) {
-  currentSide = side;
   showQuestion.classList.toggle('active', side === 'question');
   showAnswer.classList.toggle('active', side === 'answer');
-  displayResult();
+  preview.setAttribute('side', side);
 }
 
 /**
@@ -155,72 +189,52 @@ function loadExample(key) {
   templateFront.value = example.front;
   templateBack.value = example.back;
   fieldsJson.value = JSON.stringify(example.fields, null, 2);
-  cardOrdinal.value = example.cardOrdinal;
+  clozeCheckbox.checked = example.cloze;
+  cardOrd.value = example.cardOrd;
   customCss.value = example.css;
 
-  render();
+  syncPreview();
 
   // Scroll to demo section
   document.getElementById('demo').scrollIntoView({ behavior: 'smooth' });
 }
 
 /**
- * Render the card preview
+ * Push the editor state onto the component's attributes.
  */
-async function render() {
-  // Parse fields
-  let fields;
+function syncPreview() {
+  // Validate fields JSON before handing it to the component
   try {
-    fields = JSON.parse(fieldsJson.value);
+    JSON.parse(fieldsJson.value);
+    fieldsJson.classList.remove('invalid');
   } catch {
-    cardPreview.innerHTML = '<div style="color: red;">Invalid JSON in fields</div>';
+    fieldsJson.classList.add('invalid');
     return;
   }
 
-  // Build options
-  const options = {
-    front: templateFront.value,
-    back: templateBack.value,
-    fields,
-    cardOrdinal: parseInt(cardOrdinal.value) || 0,
-  };
+  preview.setAttribute('template-front', templateFront.value);
+  preview.setAttribute('template-back', templateBack.value);
+  preview.setAttribute('fields', fieldsJson.value);
 
-  try {
-    lastResult = await renderCard(options);
-    displayResult();
-  } catch (error) {
-    cardPreview.innerHTML = `<div style="color: red;">Render error: ${error.message}</div>`;
+  if (clozeCheckbox.checked) {
+    preview.setAttribute('cloze', '');
+  } else {
+    preview.removeAttribute('cloze');
   }
-}
+  preview.setAttribute('card-ord', String(parseInt(cardOrd.value, 10) || 0));
 
-/**
- * Display the rendered result
- */
-function displayResult() {
-  if (!lastResult) return;
-
-  const content = currentSide === 'answer' ? lastResult.answer : lastResult.question;
-
-  // Build CSS
-  const cssParts = [];
-  if (defaultStyles.checked) {
-    cssParts.push(DEFAULT_ANKI_CSS);
-  }
-  if (nightMode.checked) {
-    cssParts.push(NIGHT_MODE_CSS);
-  }
   if (customCss.value) {
-    cssParts.push(customCss.value);
+    preview.setAttribute('css', customCss.value);
+  } else {
+    preview.removeAttribute('css');
   }
 
-  // Update container class for night mode
+  if (nightMode.checked) {
+    preview.setAttribute('night-mode', '');
+  } else {
+    preview.removeAttribute('night-mode');
+  }
   previewContainer.classList.toggle('night-mode', nightMode.checked);
-
-  // Create styled card wrapper
-  const cardClass = nightMode.checked ? 'card nightMode' : 'card';
-  const styleTag = cssParts.length ? `<style>${cssParts.join('\n')}</style>` : '';
-
-  cardPreview.innerHTML = `${styleTag}<div class="${cardClass}">${content}</div>`;
 }
 
 // Initialize when DOM is ready
